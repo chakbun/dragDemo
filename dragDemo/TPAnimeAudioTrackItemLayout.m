@@ -10,6 +10,7 @@
 
 @interface TPAnimeAudioTrackItemLayout ()
 @property (nonatomic, strong) NSMutableArray<UICollectionViewLayoutAttributes *> *attrArray;
+@property (nonatomic, strong) NSMutableDictionary <NSIndexPath *, UICollectionViewLayoutAttributes *> *layoutAttributeMapping;
 @end
 
 @implementation TPAnimeAudioTrackItemLayout
@@ -39,16 +40,29 @@
     if ([self.delegate audioTrack4isPlaceHolderItemInSection:indexPath.section]) {
         CGPoint panningPoint = [self.delegate audioTrackLayout4PanningPoint];
         NSIndexPath *draggingIndexPath = [self getDraggingDestinationIndexPathWithPoint:panningPoint];
-        atti.frame = CGRectMake(draggingIndexPath.row * cellSize.width, draggingIndexPath.section * cellSize.height, cellSize.width, cellSize.height);
+        float placeHolderX = panningPoint.x - cellSize.width/2.f;
+        NSIndexPath *preIndexPath = [NSIndexPath indexPathForRow:draggingIndexPath.row-1 inSection:draggingIndexPath.section];
+        UICollectionViewLayoutAttributes *preAttri = self.layoutAttributeMapping[preIndexPath];
+        BOOL placeHolderXOccupied = NO;
+        if(placeHolderX < preAttri.frame.origin.x + preAttri.size.width) {
+            placeHolderXOccupied = YES;
+        }
+        //判断当前x是否有cell占用，yes:寻找当前section最近可用的。 no：使用当前位置
+        if (placeHolderXOccupied) {
+            atti.frame = CGRectMake(preAttri.frame.origin.x + preAttri.size.width, draggingIndexPath.section * cellSize.height, cellSize.width, cellSize.height);
+        }else {
+            atti.frame = CGRectMake(placeHolderX, draggingIndexPath.section * cellSize.height, cellSize.width, cellSize.height);
+        }
         atti.zIndex = 2;
         atti.alpha = [self.delegate audioTrack4DraggingIndexPath] ? 1.f : 0.f;
     }else {
-        atti.frame = CGRectMake(indexPath.row * cellSize.width, indexPath.section * cellSize.height, cellSize.width, cellSize.height);
+        atti.frame = CGRectMake(indexPath.row * (cellSize.width + 50), indexPath.section * cellSize.height, cellSize.width, cellSize.height);
         if ([self.delegate audioTrack4DraggingIndexPath] == indexPath) {
             atti.alpha = 0.f;
         }else {
             atti.alpha = 1.f;
         }
+        self.layoutAttributeMapping[indexPath] = atti;
     }
     return atti;
 }
@@ -60,8 +74,21 @@
     return _attrArray;
 }
 
+- (NSMutableDictionary<NSIndexPath *, UICollectionViewLayoutAttributes *> *)layoutAttributeMapping {
+    if (!_layoutAttributeMapping) {
+        _layoutAttributeMapping = [NSMutableDictionary dictionary];
+    }
+    return _layoutAttributeMapping;
+}
+
 #pragma mark - Public
 - (NSIndexPath *)getDraggingDestinationIndexPathWithPoint:(CGPoint)point {
+    NSIndexPath *pointAtIndexPath = [self.collectionView indexPathForItemAtPoint:point];
+    NSLog(@"getDraggingDestinationIndexPathWithPoint=> %@", pointAtIndexPath.description);
+    if (pointAtIndexPath && ![self.delegate audioTrack4isPlaceHolderItemInSection:pointAtIndexPath.section]) {
+        return pointAtIndexPath;
+    }
+    
     NSIndexPath *draggingIndexPath = [self.delegate audioTrack4DraggingIndexPath];
     CGSize cellSize = [self.delegate audioTrackLayout4ItemSizeAtIndexPath:draggingIndexPath];
     NSInteger draggingInSection = ceilf(point.y / cellSize.height) - 1;

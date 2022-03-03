@@ -26,6 +26,7 @@
 
 @property (nonatomic, assign) NSInteger draggingDestinationSection;
 @property (nonatomic, assign) NSInteger draggingDestinationRow;
+
 @end
 
 @implementation TPAudioTrackView
@@ -220,7 +221,7 @@
         [_trackCollectionView registerClass:[TPAudioTrackItemCell class] forCellWithReuseIdentifier:@"TPAudioTrackItemCell"];
         [_trackCollectionView registerClass:[TPAudioTrackItemPlaceholderCell class] forCellWithReuseIdentifier:@"TPAudioTrackItemPlaceholderCell"];
         UILongPressGestureRecognizer *longGestureReg = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(longPressGestureAction:)];
-        longGestureReg.minimumPressDuration = 0.5;
+        longGestureReg.minimumPressDuration = 0.3;
         [_trackCollectionView addGestureRecognizer:longGestureReg];
         
     }
