@@ -62,12 +62,6 @@
 
 #pragma mark - Public
 - (NSIndexPath *)getDraggingDestinationIndexPathWithPoint:(CGPoint)point {
-    
-    NSIndexPath *indexPath = [self.collectionView indexPathForItemAtPoint:point];
-    if (indexPath) {
-        return indexPath;
-    }
-
     NSIndexPath *draggingIndexPath = [self.delegate audioTrack4DraggingIndexPath];
     CGSize cellSize = [self.delegate audioTrackLayout4ItemSizeAtIndexPath:draggingIndexPath];
     NSInteger draggingInSection = ceilf(point.y / cellSize.height) - 1;

@@ -151,10 +151,8 @@
             break;
         case UIGestureRecognizerStateChanged: {
             self.panningThumbView.center = point;
-            //往数据插入占位cell？
-            if (!indexPath) {
-                indexPath = [self.itemLayout getDraggingDestinationIndexPathWithPoint:point];
-            }
+            //因为placeholder的存在，必须重新计算indexpath位置。否则取出来的位置可能是 placeholder 所在的位置。
+            indexPath = [self.itemLayout getDraggingDestinationIndexPathWithPoint:point];
             self.draggingDestinationSection = indexPath.section;
             self.draggingDestinationRow = indexPath.row;
 //            NSLog(@"changing y:%.2f, section:%i row:%i", (float)point.y, (int)draggingInSection, (int)draggingInRow);
