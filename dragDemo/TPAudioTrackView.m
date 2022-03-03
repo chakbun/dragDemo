@@ -18,14 +18,14 @@
 @property (nonatomic, strong) TPAnimeAudioTrackItemLayout *itemLayout;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSMutableArray *> *tracksInfoDic;
 @property (nonatomic, strong) NSMutableArray<NSMutableArray *> *tracksArray;
-@property (nonatomic, strong) UIView *panningThumbView;
+@property (nonatomic, strong) UIView *draggingThumbView;
 @property (nonatomic, strong) NSIndexPath *selectedIndexPath;
 @property (nonatomic, strong) NSIndexPath *draggingIndexPath;
 
 @property (nonatomic, assign) float trackItemWidth;
 
-@property (nonatomic, assign) NSInteger draggingDestinationSection;
-@property (nonatomic, assign) NSInteger draggingDestinationRow;
+@property (nonatomic, assign) NSInteger destinationSectionOfDraggingItem;
+@property (nonatomic, assign) NSInteger destinationRowOfDraggingItem;
 
 @end
 
@@ -52,11 +52,11 @@
 
 #pragma mark - UICollectionViewDataSource
 - (NSInteger)numberOfSectionsInCollectionView:(UICollectionView *)collectionView {
-    return [self audioTrackLayout4NumberOfSections];
+    return [self numberOfSection4TrackItemLayout];
 }
 
 - (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section {
-    return [self audioTrackLayout4NumberOfRowsInSection:section];
+    return [self numberOfRow4TrackItemLayoutInSection:section];
 }
 
 - (__kindof UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
@@ -78,7 +78,7 @@
 
 #pragma mark - UICollectionViewDelegate
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
-    if (![self audioTrack4isPlaceHolderItemInSection:indexPath.section]) {
+    if (![self checkItemPlaceHolderInSection:indexPath.section]) {
         self.selectedIndexPath = indexPath;
         for (TPAudioTrackItemCell *visibleCell in collectionView.visibleCells) {
             if ([visibleCell isKindOfClass:[TPAudioTrackItemCell class]]) {
@@ -96,12 +96,12 @@
 }
 
 #pragma mark - TPAnimeAudioTrackItemLayoutDelegate
-- (BOOL)audioTrackLayout4DidTrackSelected {
+- (BOOL)didTrackViewActive {
     return self.trackSelected;
 }
 
-- (NSInteger)audioTrackLayout4NumberOfRowsInSection:(NSInteger)section {
-    if ([self audioTrack4isPlaceHolderItemInSection:section]) {
+- (NSInteger)numberOfRow4TrackItemLayoutInSection:(NSInteger)section {
+    if ([self checkItemPlaceHolderInSection:section]) {
         return 1;
     }else {
         NSArray *audioModels = self.tracksArray[section];
@@ -109,62 +109,65 @@
     }
 }
 
-- (NSInteger)audioTrackLayout4NumberOfSections {
-    return self.tracksArray.count + 1; //1:trackItemHolder;
+- (NSInteger)numberOfSection4TrackItemLayout {
+    return self.tracksArray.count + (self.draggingIndexPath ? 1 : 0);
 }
 
-- (CGSize)audioTrackLayout4ItemSizeAtIndexPath:(NSIndexPath *)indexPath {
+- (CGSize)layoutItemSizeAtIndexPath:(NSIndexPath *)indexPath {
     return CGSizeMake(self.trackItemWidth, self.trackItemHeight);
 }
 
-- (CGSize)audioTrackLayout4ContentSize {
+- (CGSize)trackLayoutContentSize {
     return CGSizeMake(self.trackItemWidth * 3, self.tracksArray.count * self.trackItemHeight);
 }
 
-- (NSIndexPath *_Nullable)audioTrack4DraggingIndexPath {
+- (NSIndexPath *_Nullable)sourceIndexPathOfDraggingItem {
     return self.draggingIndexPath;
 }
 
-- (BOOL)audioTrack4isPlaceHolderItemInSection:(NSInteger)section {
+- (BOOL)checkItemPlaceHolderInSection:(NSInteger)section {
     return section >= self.tracksArray.count;
 }
 
-- (CGPoint)audioTrackLayout4PanningPoint {
-    return self.panningThumbView.center;
+- (CGPoint)currentCGPointOfDraggingItem {
+    return self.draggingThumbView.center;
 }
 
 #pragma mark - Private
 - (void)longPressGestureAction:(UILongPressGestureRecognizer *)longPressReg {
-    CGPoint point = [longPressReg locationInView:self.trackCollectionView];
-    NSIndexPath *indexPath = [self.trackCollectionView indexPathForItemAtPoint:point];
+    CGPoint pressedPointInCollectionView = [longPressReg locationInView:self.trackCollectionView];
+    NSIndexPath *pressedIndexPath = [self.trackCollectionView indexPathForItemAtPoint:pressedPointInCollectionView];
     switch (longPressReg.state) {
         case UIGestureRecognizerStateBegan: {
-            if (!indexPath) {
+            if (!pressedIndexPath) {
+                //没有按中轨道的items
                 break;
             }
-            self.draggingIndexPath = indexPath;
-            UICollectionViewCell *cell = [self.trackCollectionView cellForItemAtIndexPath:indexPath];
-            self.panningThumbView = [cell snapshotViewAfterScreenUpdates:NO];
-            self.panningThumbView.frame = cell.frame;
-            [self.trackCollectionView addSubview:self.panningThumbView];
-            [self.itemLayout invalidateLayout];
+            self.draggingIndexPath = pressedIndexPath;
+            
+            UICollectionViewCell *cell = [self.trackCollectionView cellForItemAtIndexPath:pressedIndexPath];
+            self.draggingThumbView = [cell snapshotViewAfterScreenUpdates:NO];
+            self.draggingThumbView.frame = cell.frame;
+            [self.trackCollectionView addSubview:self.draggingThumbView];
+            [self.trackCollectionView reloadData];
+//            [self.itemLayout invalidateLayout];
         }
             break;
         case UIGestureRecognizerStateChanged: {
-            self.panningThumbView.center = point;
-            //因为placeholder的存在，必须重新计算indexpath位置。否则取出来的位置可能是 placeholder 所在的位置。
-            indexPath = [self.itemLayout getDraggingDestinationIndexPathWithPoint:point];
-            self.draggingDestinationSection = indexPath.section;
-            self.draggingDestinationRow = indexPath.row;
-//            NSLog(@"changing y:%.2f, section:%i row:%i", (float)point.y, (int)draggingInSection, (int)draggingInRow);
+            self.draggingThumbView.center = pressedPointInCollectionView;
+            //预判占位cell的存在，必须手动计算 indexpath 。否则 indexpath 可能是 占位cell 的。
+            pressedIndexPath = [self.itemLayout getDraggingDestinationIndexPathWithPoint:pressedPointInCollectionView];
+            self.destinationSectionOfDraggingItem = pressedIndexPath.section;
+            self.destinationRowOfDraggingItem = pressedIndexPath.row;
+//            NSLog(@"changing y:%.2f, section:%i row:%i", (float)point.y, (int)destinationSectionOfDraggingItem, (int)destinationRowOfDraggingItem);
             [self.itemLayout invalidateLayout];
         }
             break;
         case UIGestureRecognizerStateEnded: {
             NSMutableArray *sourceTrackItems = [self.tracksArray[self.draggingIndexPath.section] mutableCopy];
             NSMutableArray *destinationTrackItems = sourceTrackItems;
-            if (self.draggingIndexPath.section != self.draggingDestinationSection) {
-                destinationTrackItems = [self.tracksArray[self.draggingDestinationSection] mutableCopy];
+            if (self.draggingIndexPath.section != self.destinationSectionOfDraggingItem) {
+                destinationTrackItems = [self.tracksArray[self.destinationSectionOfDraggingItem] mutableCopy];
             }
             
             NSDictionary *sourceTrackItem = sourceTrackItems[self.draggingIndexPath.row];
@@ -172,22 +175,22 @@
                 [sourceTrackItems removeObjectAtIndex:self.draggingIndexPath.row];
             }
             
-            if (destinationTrackItems.count < self.draggingDestinationRow) {
-                self.draggingDestinationRow = destinationTrackItems.count;
+            if (destinationTrackItems.count < self.destinationRowOfDraggingItem) {
+                self.destinationRowOfDraggingItem = destinationTrackItems.count;
             }
-            [destinationTrackItems insertObject:sourceTrackItem atIndex:self.draggingDestinationRow];
+            [destinationTrackItems insertObject:sourceTrackItem atIndex:self.destinationRowOfDraggingItem];
             /**
              self.tracksArray 是否需要过滤一下，去掉空的数组？
              另外：是否需要更新字典内容？
              */
             [self.tracksArray replaceObjectAtIndex:self.draggingIndexPath.section withObject:sourceTrackItems];
-            if (self.draggingIndexPath.section != self.draggingDestinationSection) {
-                [self.tracksArray replaceObjectAtIndex:self.draggingDestinationSection withObject:destinationTrackItems];
+            if (self.draggingIndexPath.section != self.destinationSectionOfDraggingItem) {
+                [self.tracksArray replaceObjectAtIndex:self.destinationSectionOfDraggingItem withObject:destinationTrackItems];
             }
-            [self.trackCollectionView reloadData];
             self.draggingIndexPath = nil;
-            [self.panningThumbView removeFromSuperview];
-            self.panningThumbView = nil;
+            [self.draggingThumbView removeFromSuperview];
+            self.draggingThumbView = nil;
+            [self.trackCollectionView reloadData];
         }
             break;
         default:

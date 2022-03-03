@@ -9,40 +9,42 @@
 #import "TPAnimeAudioTrackItemLayout.h"
 
 @interface TPAnimeAudioTrackItemLayout ()
-@property (nonatomic, strong) NSMutableArray<UICollectionViewLayoutAttributes *> *attrArray;
-@property (nonatomic, strong) NSMutableDictionary <NSIndexPath *, UICollectionViewLayoutAttributes *> *layoutAttributeMapping;
+@property (nonatomic, strong) NSMutableArray<UICollectionViewLayoutAttributes *> *layoutItemAttrs;
+@property (nonatomic, strong) NSMutableDictionary <NSIndexPath *, UICollectionViewLayoutAttributes *> *layoutItemIndexAttrMap;
 @end
 
 @implementation TPAnimeAudioTrackItemLayout
 - (void)prepareLayout {
     [super prepareLayout];
-    [self.attrArray removeAllObjects];
     
-    for(int i = 0; i < [self.delegate audioTrackLayout4NumberOfSections]; i++) {
-        for(int j = 0; j < [self.delegate audioTrackLayout4NumberOfRowsInSection:i]; j++) {
-            UICollectionViewLayoutAttributes *attr = [self layoutAttributesForItemAtIndexPath:[NSIndexPath indexPathForRow:j inSection:i]];
-            [self.attrArray addObject:attr];
+    [self.layoutItemAttrs removeAllObjects];
+    for(int i = 0; i < [self.delegate numberOfSection4TrackItemLayout]; i++) {
+        for(int j = 0; j < [self.delegate numberOfRow4TrackItemLayoutInSection:i]; j++) {
+            NSIndexPath *indexPath = [NSIndexPath indexPathForRow:j inSection:i];
+            UICollectionViewLayoutAttributes *attr = [self layoutAttributesForItemAtIndexPath:indexPath];
+            [self.layoutItemAttrs addObject:attr];
+            [self.layoutItemIndexAttrMap setObject:attr forKey:indexPath];
         }
     }
 }
 
 - (CGSize)collectionViewContentSize {
-    return self.delegate.audioTrackLayout4ContentSize;
+    return self.delegate.trackLayoutContentSize;
 }
 
 - (NSArray<__kindof UICollectionViewLayoutAttributes *> *)layoutAttributesForElementsInRect:(CGRect)rect {
-    return self.attrArray;
+    return self.layoutItemAttrs;
 }
 
 - (UICollectionViewLayoutAttributes *)layoutAttributesForItemAtIndexPath:(NSIndexPath *)indexPath {
     UICollectionViewLayoutAttributes *atti = [UICollectionViewLayoutAttributes layoutAttributesForCellWithIndexPath:indexPath];
-    CGSize cellSize = [self.delegate audioTrackLayout4ItemSizeAtIndexPath:indexPath];
-    if ([self.delegate audioTrack4isPlaceHolderItemInSection:indexPath.section]) {
-        CGPoint panningPoint = [self.delegate audioTrackLayout4PanningPoint];
+    CGSize cellSize = [self.delegate layoutItemSizeAtIndexPath:indexPath];
+    if ([self.delegate checkItemPlaceHolderInSection:indexPath.section]) {
+        CGPoint panningPoint = [self.delegate currentCGPointOfDraggingItem];
         NSIndexPath *draggingIndexPath = [self getDraggingDestinationIndexPathWithPoint:panningPoint];
         float placeHolderX = panningPoint.x - cellSize.width/2.f;
         NSIndexPath *preIndexPath = [NSIndexPath indexPathForRow:draggingIndexPath.row-1 inSection:draggingIndexPath.section];
-        UICollectionViewLayoutAttributes *preAttri = self.layoutAttributeMapping[preIndexPath];
+        UICollectionViewLayoutAttributes *preAttri = self.layoutItemIndexAttrMap[preIndexPath];
         BOOL placeHolderXOccupied = NO;
         if(placeHolderX < preAttri.frame.origin.x + preAttri.size.width) {
             placeHolderXOccupied = YES;
@@ -54,50 +56,51 @@
             atti.frame = CGRectMake(placeHolderX, draggingIndexPath.section * cellSize.height, cellSize.width, cellSize.height);
         }
         atti.zIndex = 2;
-        atti.alpha = [self.delegate audioTrack4DraggingIndexPath] ? 1.f : 0.f;
+        atti.alpha = [self.delegate sourceIndexPathOfDraggingItem] ? 1.f : 0.f;
     }else {
         atti.frame = CGRectMake(indexPath.row * (cellSize.width + 50), indexPath.section * cellSize.height, cellSize.width, cellSize.height);
-        if ([self.delegate audioTrack4DraggingIndexPath] == indexPath) {
+        if ([self.delegate sourceIndexPathOfDraggingItem] == indexPath) {
+            //处于拖拽状态的item在原位置隐藏起来。
             atti.alpha = 0.f;
         }else {
             atti.alpha = 1.f;
         }
-        self.layoutAttributeMapping[indexPath] = atti;
     }
     return atti;
 }
 
-- (NSMutableArray *)attrArray {
-    if (!_attrArray) {
-        _attrArray = [NSMutableArray array];
+#pragma mark - Getter
+- (NSMutableArray *)layoutItemAttrs {
+    if (!_layoutItemAttrs) {
+        _layoutItemAttrs = [NSMutableArray array];
     }
-    return _attrArray;
+    return _layoutItemAttrs;
 }
 
-- (NSMutableDictionary<NSIndexPath *, UICollectionViewLayoutAttributes *> *)layoutAttributeMapping {
-    if (!_layoutAttributeMapping) {
-        _layoutAttributeMapping = [NSMutableDictionary dictionary];
+- (NSMutableDictionary<NSIndexPath *, UICollectionViewLayoutAttributes *> *)layoutItemIndexAttrMap {
+    if (!_layoutItemIndexAttrMap) {
+        _layoutItemIndexAttrMap = [NSMutableDictionary dictionary];
     }
-    return _layoutAttributeMapping;
+    return _layoutItemIndexAttrMap;
 }
 
 #pragma mark - Public
 - (NSIndexPath *)getDraggingDestinationIndexPathWithPoint:(CGPoint)point {
     NSIndexPath *pointAtIndexPath = [self.collectionView indexPathForItemAtPoint:point];
     NSLog(@"getDraggingDestinationIndexPathWithPoint=> %@", pointAtIndexPath.description);
-    if (pointAtIndexPath && ![self.delegate audioTrack4isPlaceHolderItemInSection:pointAtIndexPath.section]) {
+    if (pointAtIndexPath && ![self.delegate checkItemPlaceHolderInSection:pointAtIndexPath.section]) {
         return pointAtIndexPath;
     }
     
-    NSIndexPath *draggingIndexPath = [self.delegate audioTrack4DraggingIndexPath];
-    CGSize cellSize = [self.delegate audioTrackLayout4ItemSizeAtIndexPath:draggingIndexPath];
+    NSIndexPath *draggingIndexPath = [self.delegate sourceIndexPathOfDraggingItem];
+    CGSize cellSize = [self.delegate layoutItemSizeAtIndexPath:draggingIndexPath];
     NSInteger draggingInSection = ceilf(point.y / cellSize.height) - 1;
     draggingInSection = MAX(0, draggingInSection);
     /**
      这样还得考虑一个问题：就是得改变 holder 的样式。fuck！
      */
     NSInteger draggingInRow = 0;
-    NSInteger count = [self.delegate audioTrackLayout4NumberOfRowsInSection:draggingInSection];
+    NSInteger count = [self.delegate numberOfRow4TrackItemLayoutInSection:draggingInSection];
     float sectionWidth = cellSize.width*count;
     if (point.x >= sectionWidth) {
         //尾部插入

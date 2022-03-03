@@ -13,14 +13,16 @@ NS_ASSUME_NONNULL_BEGIN
 @protocol TPAnimeAudioTrackItemLayoutDelegate <NSObject>
 
 @required
-- (NSInteger)audioTrackLayout4NumberOfSections;
-- (NSInteger)audioTrackLayout4NumberOfRowsInSection:(NSInteger)section;
-- (BOOL)audioTrackLayout4DidTrackSelected;
-- (CGSize)audioTrackLayout4ItemSizeAtIndexPath:(NSIndexPath *)indexPath;
-- (CGSize)audioTrackLayout4ContentSize;
-- (NSIndexPath *_Nullable)audioTrack4DraggingIndexPath;
-- (BOOL)audioTrack4isPlaceHolderItemInSection:(NSInteger)section;
-- (CGPoint)audioTrackLayout4PanningPoint;
+- (NSInteger)numberOfSection4TrackItemLayout;
+- (NSInteger)numberOfRow4TrackItemLayoutInSection:(NSInteger)section;
+- (BOOL)didTrackViewActive; //yes：被选中状态（更大）
+
+- (CGSize)layoutItemSizeAtIndexPath:(NSIndexPath *)indexPath;
+- (CGSize)trackLayoutContentSize;
+
+- (NSIndexPath *_Nullable)sourceIndexPathOfDraggingItem; //移动块的源头
+- (CGPoint)currentCGPointOfDraggingItem; //移动块的相对父view的(x,y)
+- (BOOL)checkItemPlaceHolderInSection:(NSInteger)section; //是否是拖动显示的展位section
 @end
 
 @interface TPAnimeAudioTrackItemLayout : UICollectionViewFlowLayout
