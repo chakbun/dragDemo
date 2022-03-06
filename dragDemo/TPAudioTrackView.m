@@ -35,9 +35,9 @@
     if (self = [super initWithFrame:frame]) {
         self.trackItemWidth = 100;
         self.tracksInfoDic = [@{
-            @"track_1": @[@{@"name": @"audio1", @"color": [UIColor redColor],}],
-            @"track_2": @[@{@"name": @"audio2", @"color": [UIColor greenColor],}],
-            @"track_3": @[@{@"name": @"audio3", @"color": [UIColor blueColor],}],
+            @"track_1": @[@{@"name": @"audio1", @"color": [UIColor redColor], @"location": @0, @"length": @100}],
+            @"track_2": @[@{@"name": @"audio2", @"color": [UIColor greenColor], @"location": @20, @"length": @100}],
+            @"track_3": @[@{@"name": @"audio3", @"color": [UIColor blueColor], @"location": @30, @"length": @100}],
         } mutableCopy];
         
         self.tracksArray = [self.tracksInfoDic.allValues mutableCopy];
@@ -78,7 +78,7 @@
 
 #pragma mark - UICollectionViewDelegate
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
-    if (![self checkItemPlaceHolderInSection:indexPath.section]) {
+    if (![self isAutoAssociationInSection:indexPath.section]) {
         self.selectedIndexPath = indexPath;
         for (TPAudioTrackItemCell *visibleCell in collectionView.visibleCells) {
             if ([visibleCell isKindOfClass:[TPAudioTrackItemCell class]]) {
@@ -101,7 +101,7 @@
 }
 
 - (NSInteger)numberOfRow4TrackItemLayoutInSection:(NSInteger)section {
-    if ([self checkItemPlaceHolderInSection:section]) {
+    if ([self isAutoAssociationInSection:section]) {
         return 1;
     }else {
         NSArray *audioModels = self.tracksArray[section];
@@ -113,8 +113,11 @@
     return self.tracksArray.count + (self.draggingIndexPath ? 1 : 0);
 }
 
-- (CGSize)layoutItemSizeAtIndexPath:(NSIndexPath *)indexPath {
-    return CGSizeMake(self.trackItemWidth, self.trackItemHeight);
+- (CGRect)layoutItemFrameAtIndexPath:(NSIndexPath *)indexPath {
+    NSDictionary *itemInfo = self.tracksArray[indexPath.section][indexPath.row];
+    float x = [itemInfo[@"location"] floatValue];
+    float width = x + [itemInfo[@"length"] floatValue];
+    return CGRectMake(x, indexPath.section*self.trackItemHeight, width, self.trackItemHeight);
 }
 
 - (CGSize)trackLayoutContentSize {
@@ -125,7 +128,7 @@
     return self.draggingIndexPath;
 }
 
-- (BOOL)checkItemPlaceHolderInSection:(NSInteger)section {
+- (BOOL)isAutoAssociationInSection:(NSInteger)section {
     return section >= self.tracksArray.count;
 }
 
@@ -156,7 +159,9 @@
         case UIGestureRecognizerStateChanged: {
             self.draggingThumbView.center = pressedPointInCollectionView;
             //预判占位cell的存在，必须手动计算 indexpath 。否则 indexpath 可能是 占位cell 的。
-            pressedIndexPath = [self.itemLayout getDraggingDestinationIndexPathWithPoint:pressedPointInCollectionView];
+            if (!pressedIndexPath || [self isAutoAssociationInSection:pressedIndexPath.section]) {
+                pressedIndexPath = [self.itemLayout nearestIndexPathForLayoutItemAtPoint:pressedPointInCollectionView];
+            }
             self.destinationSectionOfDraggingItem = pressedIndexPath.section;
             self.destinationRowOfDraggingItem = pressedIndexPath.row;
 //            NSLog(@"changing y:%.2f, section:%i row:%i", (float)point.y, (int)destinationSectionOfDraggingItem, (int)destinationRowOfDraggingItem);

@@ -14,10 +14,8 @@
 @end
 
 @implementation ViewController
-
 - (void)viewDidLoad {
     [super viewDidLoad];
-    
     UITapGestureRecognizer *tapGestureRec = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapGestureAction:)];
     tapGestureRec.cancelsTouchesInView = NO;
     [self.view addGestureRecognizer:tapGestureRec];

@@ -17,19 +17,19 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSInteger)numberOfRow4TrackItemLayoutInSection:(NSInteger)section;
 - (BOOL)didTrackViewActive; //yes：被选中状态（更大）
 
-- (CGSize)layoutItemSizeAtIndexPath:(NSIndexPath *)indexPath;
+- (CGRect)layoutItemFrameAtIndexPath:(NSIndexPath *)indexPath;
 - (CGSize)trackLayoutContentSize;
 
 - (NSIndexPath *_Nullable)sourceIndexPathOfDraggingItem; //移动块的源头
 - (CGPoint)currentCGPointOfDraggingItem; //移动块的相对父view的(x,y)
-- (BOOL)checkItemPlaceHolderInSection:(NSInteger)section; //是否是拖动显示的展位section
+- (BOOL)isAutoAssociationInSection:(NSInteger)section; //是否是拖动显示的展位section
 @end
 
 @interface TPAnimeAudioTrackItemLayout : UICollectionViewFlowLayout
 
 @property (nonatomic, weak) id<TPAnimeAudioTrackItemLayoutDelegate> delegate;
 
-- (NSIndexPath *)getDraggingDestinationIndexPathWithPoint:(CGPoint)point;
+- (NSIndexPath *)nearestIndexPathForLayoutItemAtPoint:(CGPoint)point;
 
 @end
 
