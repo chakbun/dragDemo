@@ -8,6 +8,18 @@
 
 #import "TPAnimeAudioTrackItemLayout.h"
 
+#pragma mark - Function
+static float leftOfRect(CGRect rect) {
+    return rect.origin.x;
+}
+
+static float widthOfRect(CGRect rect) {
+    return rect.size.width;
+}
+static float centerXOfRect(CGRect rect) {
+    return leftOfRect(rect) + widthOfRect(rect)/2.f;
+}
+
 @interface TPAnimeAudioTrackItemLayout ()
 @property (nonatomic, strong) NSMutableArray<UICollectionViewLayoutAttributes *> *layoutItemAttrs;
 @property (nonatomic, strong) NSMutableDictionary <NSIndexPath *, UICollectionViewLayoutAttributes *> *layoutItemIndexAttrMap;
@@ -64,7 +76,7 @@
         BOOL isAutoAssociationcCellIndexPath = [self.delegate isAutoAssociationInSection:currentPointOnIndexPath.section];
         BOOL draggingAboveItemCell = currentPointOnIndexPath && !isAutoAssociationcCellIndexPath && (currentPointOnIndexPath != sourceIndexPath);
         
-        float autoAssociationViewX = currentDraggingPoint.x - soureItemFrame.size.width/2.f;
+        float autoAssociationViewX = currentDraggingPoint.x - widthOfRect(soureItemFrame)/2.f;
 
         self.compareIndexPathPosition = 0; //0:pre 1:next;
         
@@ -73,8 +85,9 @@
             if (!isAutoAssociationcCellIndexPath) {
                 //当前手指所在的 cell 的 UICollectionViewLayoutAttributes 👇
                 UICollectionViewLayoutAttributes *abvCellattri = self.layoutItemIndexAttrMap[currentPointOnIndexPath];
-                float abvCellCenterX = (abvCellattri.frame.origin.x + abvCellattri.frame.size.width/2.f);
-                if (autoAssociationViewX > abvCellCenterX) {
+                float abvCellCenterX = centerXOfRect(abvCellattri.frame);
+                if (currentDraggingPoint.x > abvCellCenterX) {
+                    NSLog(@"autoAssociationViewX > abvCellCenterX =======> right");
                     //寻找下一个元素的空位。
                     NSIndexPath *nextIndexPath = [NSIndexPath indexPathForRow:currentPointOnIndexPath.row + 1 inSection:currentPointOnIndexPath.section];
                     if(self.layoutItemIndexAttrMap[nextIndexPath]) {
@@ -82,10 +95,12 @@
                         compareIndexPath = nextIndexPath;
                         self.compareIndexPathPosition = 1;
                     }else {
+                        compareIndexPath = currentPointOnIndexPath;
                         //没有下一个元素，插到末尾。
                     }
                     
                 }else {
+                    NSLog(@"autoAssociationViewX < abvCellCenterX =======> left");
                     //寻找上一个元素
                     NSIndexPath *preIndexPath = [NSIndexPath indexPathForRow:currentPointOnIndexPath.row - 1 inSection:currentPointOnIndexPath.section];
                     if(self.layoutItemIndexAttrMap[preIndexPath]) {
@@ -112,10 +127,15 @@
             //比较左边👈
             if ((compareIndexPath.row == [self.delegate numberOfRow4TrackItemLayoutInSection:currentPointOnIndexPath.section] -1) && currentPointOnIndexPath != sourceIndexPath && (compareIndexPath = currentPointOnIndexPath)) {
                 //### FOR CASE3 above
-                placeHolderXOccupied = ( autoAssociationViewX < (compareAttri.frame.origin.x + compareAttri.size.width) );
+                placeHolderXOccupied = ( autoAssociationViewX < centerXOfRect(compareAttri.frame));
             }else if(currentPointOnIndexPath != sourceIndexPath){
                 //不在自己原来位置上的拖动。
-                placeHolderXOccupied = ( autoAssociationViewX > compareAttri.frame.origin.x );
+                placeHolderXOccupied = ( autoAssociationViewX > leftOfRect(compareAttri.frame));
+            }else if(currentPointOnIndexPath == sourceIndexPath){
+                //比较自己
+                if (compareAttri.frame.origin.x) {
+                    
+                }
             }
         }else {
             //比较右边👉

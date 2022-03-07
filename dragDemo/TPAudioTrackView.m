@@ -164,7 +164,7 @@
             }
             self.destinationSectionOfDraggingItem = pressedIndexPath.section;
             self.destinationRowOfDraggingItem = pressedIndexPath.row;
-            NSLog(@"changing y:%.2f, section:%i row:%i", (float)pressedPointInCollectionView.y, (int)self.destinationSectionOfDraggingItem, (int)self.destinationRowOfDraggingItem);
+//            NSLog(@"changing y:%.2f, section:%i row:%i", (float)pressedPointInCollectionView.y, (int)self.destinationSectionOfDraggingItem, (int)self.destinationRowOfDraggingItem);
             [self.itemLayout invalidateLayout];
         }
             break;
@@ -187,10 +187,10 @@
                     //场景：轨道只有一个元素，然后在轨道内移动元素。
                     self.destinationRowOfDraggingItem = destinationTrackItems.count;
                 }
-                if (destinationTrackItems.count == 0) {
-                    [destinationTrackItems addObject:sourceTrackItem];
-                }else {
+                if (self.draggingIndexPath.section != self.destinationSectionOfDraggingItem) {
                     [destinationTrackItems insertObject:sourceTrackItem atIndex:self.destinationRowOfDraggingItem+1];
+                }else {
+                    [destinationTrackItems insertObject:sourceTrackItem atIndex:self.destinationRowOfDraggingItem];
                 }
             }else {
                 [destinationTrackItems insertObject:sourceTrackItem atIndex:self.destinationRowOfDraggingItem-1];
