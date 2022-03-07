@@ -44,6 +44,7 @@
 		CE57206127CF4FC400006A15 /* TPAudioTrackItemCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TPAudioTrackItemCell.m; sourceTree = "<group>"; };
 		CE57206327CF5DAD00006A15 /* TPAudioTrackItemPlaceholderCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TPAudioTrackItemPlaceholderCell.h; sourceTree = "<group>"; };
 		CE57206427CF5DAD00006A15 /* TPAudioTrackItemPlaceholderCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TPAudioTrackItemPlaceholderCell.m; sourceTree = "<group>"; };
+		DF6610AF27D661A700952DFE /* TPAnimeTrackLayoutViewFunc.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TPAnimeTrackLayoutViewFunc.h; sourceTree = "<group>"; };
 		E8A950C950E908F5AEA1E22A /* Pods_dragDemo.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_dragDemo.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -105,6 +106,7 @@
 				CE57204327CF1B1900006A15 /* ViewController.m */,
 				CE57205527CF1B7F00006A15 /* TPAudioTrackView.h */,
 				CE57205627CF1B7F00006A15 /* TPAudioTrackView.m */,
+				DF6610AF27D661A700952DFE /* TPAnimeTrackLayoutViewFunc.h */,
 				CE57205827CF1B9200006A15 /* TPAnimeAudioTrackItemLayout.h */,
 				CE57205927CF1B9200006A15 /* TPAnimeAudioTrackItemLayout.m */,
 				CE57206027CF4FC400006A15 /* TPAudioTrackItemCell.h */,

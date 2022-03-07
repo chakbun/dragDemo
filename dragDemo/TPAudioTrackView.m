@@ -183,15 +183,14 @@
             sourceTrackItem[@"location"] = @(self.itemLayout.autoAssociationCellRect.origin.x);
             sourceTrackItem[@"length"] = @(self.itemLayout.autoAssociationCellRect.size.width);
             if (self.itemLayout.autoAssociationInsertPosition == 0) {
+                if (self.draggingIndexPath.section != self.destinationSectionOfDraggingItem) {
+                    self.destinationRowOfDraggingItem =+1;
+                }
                 if (destinationTrackItems.count < self.destinationRowOfDraggingItem) {
-                    //场景：轨道只有一个元素，然后在轨道内移动元素。
                     self.destinationRowOfDraggingItem = destinationTrackItems.count;
                 }
-                if (self.draggingIndexPath.section != self.destinationSectionOfDraggingItem) {
-                    [destinationTrackItems insertObject:sourceTrackItem atIndex:self.destinationRowOfDraggingItem+1];
-                }else {
-                    [destinationTrackItems insertObject:sourceTrackItem atIndex:self.destinationRowOfDraggingItem];
-                }
+                [destinationTrackItems insertObject:sourceTrackItem atIndex:self.destinationRowOfDraggingItem];
+
             }else {
                 [destinationTrackItems insertObject:sourceTrackItem atIndex:self.destinationRowOfDraggingItem-1];
             }

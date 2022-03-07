@@ -7,18 +7,7 @@
 //
 
 #import "TPAnimeAudioTrackItemLayout.h"
-
-#pragma mark - Function
-static float leftOfRect(CGRect rect) {
-    return rect.origin.x;
-}
-
-static float widthOfRect(CGRect rect) {
-    return rect.size.width;
-}
-static float centerXOfRect(CGRect rect) {
-    return leftOfRect(rect) + widthOfRect(rect)/2.f;
-}
+#import "TPAnimeTrackLayoutViewFunc.h"
 
 @interface TPAnimeAudioTrackItemLayout ()
 @property (nonatomic, strong) NSMutableArray<UICollectionViewLayoutAttributes *> *layoutItemAttrs;
@@ -80,6 +69,18 @@ static float centerXOfRect(CGRect rect) {
 
         self.compareIndexPathPosition = 0; //0:pre 1:next;
         
+        
+        /**
+         ###1 同一行拖动
+         => 1.1 没有改变当前数组顺序（indexpath不变）：判断点击cell 的 pre right 和 next left；
+         => 1.2 改变了当前数组顺序（indexg改变）
+         ==> 1.2.1 与cell重合 ，判断当前触碰点与位于重合cell中点位置。
+         ===> 1.2.1.1 位于中点左边 👈，判断重合cell left 是否有足够空间（或切割）；
+         ===> 1.2.1.2 位于中点右边 👉，判断重合cell right 是否有足够空间（或切割）；
+         ==> 1.2.2 与cell不重合：判断同 1.1；
+         
+         */
+        
         if (draggingAboveItemCell) {
             //判断是在 cell 中点的左边还是右边。
             if (!isAutoAssociationcCellIndexPath) {
@@ -125,7 +126,7 @@ static float centerXOfRect(CGRect rect) {
         
         if (self.compareIndexPathPosition == 0) {
             //比较左边👈
-            if ((compareIndexPath.row == [self.delegate numberOfRow4TrackItemLayoutInSection:currentPointOnIndexPath.section] -1) && currentPointOnIndexPath != sourceIndexPath && (compareIndexPath = currentPointOnIndexPath)) {
+            if ((compareIndexPath.row == [self.delegate numberOfRow4TrackItemLayoutInSection:currentPointOnIndexPath.section] -1) && currentPointOnIndexPath != sourceIndexPath && (compareIndexPath == currentPointOnIndexPath)) {
                 //### FOR CASE3 above
                 placeHolderXOccupied = ( autoAssociationViewX < centerXOfRect(compareAttri.frame));
             }else if(currentPointOnIndexPath != sourceIndexPath){
@@ -140,6 +141,8 @@ static float centerXOfRect(CGRect rect) {
         }else {
             //比较右边👉
         }
+        
+        
         
         //判断当前x是否有cell占用，yes:寻找当前section最近可用的。 no：使用当前位置
         //这里还得根据塞入的位置改变 size。
