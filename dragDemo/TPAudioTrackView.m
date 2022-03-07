@@ -153,7 +153,7 @@
             self.draggingThumbView.frame = cell.frame;
             [self.trackCollectionView addSubview:self.draggingThumbView];
             [self.trackCollectionView reloadData];
-//            [self.itemLayout invalidateLayout];
+            //            [self.itemLayout invalidateLayout];
         }
             break;
         case UIGestureRecognizerStateChanged: {
@@ -164,7 +164,7 @@
             }
             self.destinationSectionOfDraggingItem = pressedIndexPath.section;
             self.destinationRowOfDraggingItem = pressedIndexPath.row;
-//            NSLog(@"changing y:%.2f, section:%i row:%i", (float)point.y, (int)destinationSectionOfDraggingItem, (int)destinationRowOfDraggingItem);
+            NSLog(@"changing y:%.2f, section:%i row:%i", (float)pressedPointInCollectionView.y, (int)self.destinationSectionOfDraggingItem, (int)self.destinationRowOfDraggingItem);
             [self.itemLayout invalidateLayout];
         }
             break;
@@ -180,15 +180,21 @@
                 [sourceTrackItems removeObjectAtIndex:self.draggingIndexPath.row];
             }
             
-            if (destinationTrackItems.count < self.destinationRowOfDraggingItem) {
-                self.destinationRowOfDraggingItem = destinationTrackItems.count;
-            }
             sourceTrackItem[@"location"] = @(self.itemLayout.autoAssociationCellRect.origin.x);
             sourceTrackItem[@"length"] = @(self.itemLayout.autoAssociationCellRect.size.width);
-            [destinationTrackItems insertObject:sourceTrackItem atIndex:self.destinationRowOfDraggingItem];
-            /**
-             
-             */
+            if (self.itemLayout.autoAssociationInsertPosition == 0) {
+                if (destinationTrackItems.count < self.destinationRowOfDraggingItem) {
+                    //场景：轨道只有一个元素，然后在轨道内移动元素。
+                    self.destinationRowOfDraggingItem = destinationTrackItems.count;
+                }
+                if (destinationTrackItems.count == 0) {
+                    [destinationTrackItems addObject:sourceTrackItem];
+                }else {
+                    [destinationTrackItems insertObject:sourceTrackItem atIndex:self.destinationRowOfDraggingItem+1];
+                }
+            }else {
+                [destinationTrackItems insertObject:sourceTrackItem atIndex:self.destinationRowOfDraggingItem-1];
+            }
             [self.tracksArray replaceObjectAtIndex:self.draggingIndexPath.section withObject:sourceTrackItems];
             if (self.draggingIndexPath.section != self.destinationSectionOfDraggingItem) {
                 [self.tracksArray replaceObjectAtIndex:self.destinationSectionOfDraggingItem withObject:destinationTrackItems];

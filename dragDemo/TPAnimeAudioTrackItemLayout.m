@@ -16,6 +16,8 @@
 
 @property (nonatomic, assign) CGRect associationCellFrame;
 
+@property (nonatomic, assign) NSInteger compareIndexPathPosition;
+
 @end
 
 @implementation TPAnimeAudioTrackItemLayout
@@ -56,25 +58,76 @@
         CGRect soureItemFrame = [self.delegate layoutItemFrameAtIndexPath:sourceIndexPath];
         CGPoint currentDraggingPoint = [self.delegate currentCGPointOfDraggingItem];
         
-        NSIndexPath *draggingIndexPath = [self.collectionView indexPathForItemAtPoint:currentDraggingPoint];
-        BOOL draggingAboveItemCell = draggingIndexPath && ![self.delegate isAutoAssociationInSection:draggingIndexPath.section];
-        if (!draggingAboveItemCell) {
-            draggingIndexPath = [self nearestIndexPathForLayoutItemAtPoint:currentDraggingPoint];
-        }
+        NSIndexPath *currentPointOnIndexPath = [self.collectionView indexPathForItemAtPoint:currentDraggingPoint];
+        NSIndexPath *compareIndexPath = nil;
+        NSLog(@"draggingIndexPath=%@", currentPointOnIndexPath.description);
+        BOOL isAutoAssociationcCellIndexPath = [self.delegate isAutoAssociationInSection:currentPointOnIndexPath.section];
+        BOOL draggingAboveItemCell = currentPointOnIndexPath && !isAutoAssociationcCellIndexPath && (currentPointOnIndexPath != sourceIndexPath);
         
         float autoAssociationViewX = currentDraggingPoint.x - soureItemFrame.size.width/2.f;
-        UICollectionViewLayoutAttributes *preAttri = self.layoutItemIndexAttrMap[draggingIndexPath];
-        BOOL placeHolderXOccupied = NO;
-        if ((draggingIndexPath.row == [self.delegate numberOfRow4TrackItemLayoutInSection:draggingIndexPath.section] -1) && draggingIndexPath != sourceIndexPath) {
-            placeHolderXOccupied = autoAssociationViewX < (preAttri.frame.origin.x + preAttri.size.width);
-        }
-        //判断当前x是否有cell占用，yes:寻找当前section最近可用的。 no：使用当前位置
-        if (placeHolderXOccupied) {
-            atti.frame = CGRectMake(preAttri.frame.origin.x + preAttri.size.width, draggingIndexPath.section * soureItemFrame.size.height, soureItemFrame.size.width, soureItemFrame.size.height);
+
+        self.compareIndexPathPosition = 0; //0:pre 1:next;
+        
+        if (draggingAboveItemCell) {
+            //判断是在 cell 中点的左边还是右边。
+            if (!isAutoAssociationcCellIndexPath) {
+                //当前手指所在的 cell 的 UICollectionViewLayoutAttributes 👇
+                UICollectionViewLayoutAttributes *abvCellattri = self.layoutItemIndexAttrMap[currentPointOnIndexPath];
+                float abvCellCenterX = (abvCellattri.frame.origin.x + abvCellattri.frame.size.width/2.f);
+                if (autoAssociationViewX > abvCellCenterX) {
+                    //寻找下一个元素的空位。
+                    NSIndexPath *nextIndexPath = [NSIndexPath indexPathForRow:currentPointOnIndexPath.row + 1 inSection:currentPointOnIndexPath.section];
+                    if(self.layoutItemIndexAttrMap[nextIndexPath]) {
+                        //表示有下一个元素。
+                        compareIndexPath = nextIndexPath;
+                        self.compareIndexPathPosition = 1;
+                    }else {
+                        //没有下一个元素，插到末尾。
+                    }
+                    
+                }else {
+                    //寻找上一个元素
+                    NSIndexPath *preIndexPath = [NSIndexPath indexPathForRow:currentPointOnIndexPath.row - 1 inSection:currentPointOnIndexPath.section];
+                    if(self.layoutItemIndexAttrMap[preIndexPath]) {
+                        //有上一个元素。
+                        compareIndexPath = preIndexPath;
+                        self.compareIndexPathPosition = 0;
+                    }else {
+                        //没有上一个元素。
+                    }
+                    
+                }
+            }
         }else {
-            atti.frame = CGRectMake(autoAssociationViewX, draggingIndexPath.section * soureItemFrame.size.height, soureItemFrame.size.width, soureItemFrame.size.height);
+            //### CASE3
+            currentPointOnIndexPath = [self nearestIndexPathForLayoutItemAtPoint:currentDraggingPoint];
+            compareIndexPath = currentPointOnIndexPath;
+            self.compareIndexPathPosition = 0;
         }
-        NSLog(@"associationCellFrame=%@", NSStringFromCGRect(atti.frame));
+        
+        UICollectionViewLayoutAttributes *compareAttri = self.layoutItemIndexAttrMap[compareIndexPath];
+        BOOL placeHolderXOccupied = NO;
+        
+        if (self.compareIndexPathPosition == 0) {
+            //比较左边👈
+            if ((compareIndexPath.row == [self.delegate numberOfRow4TrackItemLayoutInSection:currentPointOnIndexPath.section] -1) && currentPointOnIndexPath != sourceIndexPath && (compareIndexPath = currentPointOnIndexPath)) {
+                //### FOR CASE3 above
+                placeHolderXOccupied = ( autoAssociationViewX < (compareAttri.frame.origin.x + compareAttri.size.width) );
+            }else if(currentPointOnIndexPath != sourceIndexPath){
+                //不在自己原来位置上的拖动。
+                placeHolderXOccupied = ( autoAssociationViewX > compareAttri.frame.origin.x );
+            }
+        }else {
+            //比较右边👉
+        }
+        
+        //判断当前x是否有cell占用，yes:寻找当前section最近可用的。 no：使用当前位置
+        //这里还得根据塞入的位置改变 size。
+        if (placeHolderXOccupied) {
+            atti.frame = CGRectMake(compareAttri.frame.origin.x + compareAttri.size.width, currentPointOnIndexPath.section * soureItemFrame.size.height, soureItemFrame.size.width, soureItemFrame.size.height);
+        }else {
+            atti.frame = CGRectMake(autoAssociationViewX, currentPointOnIndexPath.section * soureItemFrame.size.height, soureItemFrame.size.width, soureItemFrame.size.height);
+        }
         self.associationCellFrame = atti.frame;
         atti.zIndex = 2;
         atti.alpha = sourceIndexPath ? 1.f : 0.f;
@@ -92,6 +145,10 @@
 }
 
 #pragma mark - Getter
+- (NSInteger)autoAssociationInsertPosition {
+    return self.compareIndexPathPosition;
+}
+
 - (CGRect)autoAssociationCellRect {
     return self.associationCellFrame;
 }
