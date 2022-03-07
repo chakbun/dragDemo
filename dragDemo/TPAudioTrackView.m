@@ -116,7 +116,7 @@
 - (CGRect)layoutItemFrameAtIndexPath:(NSIndexPath *)indexPath {
     NSDictionary *itemInfo = self.tracksArray[indexPath.section][indexPath.row];
     float x = [itemInfo[@"location"] floatValue];
-    float width = x + [itemInfo[@"length"] floatValue];
+    float width = [itemInfo[@"length"] floatValue];
     return CGRectMake(x, indexPath.section*self.trackItemHeight, width, self.trackItemHeight);
 }
 
@@ -175,7 +175,7 @@
                 destinationTrackItems = [self.tracksArray[self.destinationSectionOfDraggingItem] mutableCopy];
             }
             
-            NSDictionary *sourceTrackItem = sourceTrackItems[self.draggingIndexPath.row];
+            NSMutableDictionary *sourceTrackItem = [sourceTrackItems[self.draggingIndexPath.row] mutableCopy];
             if (sourceTrackItems.count > self.draggingIndexPath.row) {
                 [sourceTrackItems removeObjectAtIndex:self.draggingIndexPath.row];
             }
@@ -183,10 +183,11 @@
             if (destinationTrackItems.count < self.destinationRowOfDraggingItem) {
                 self.destinationRowOfDraggingItem = destinationTrackItems.count;
             }
+            sourceTrackItem[@"location"] = @(self.itemLayout.autoAssociationCellRect.origin.x);
+            sourceTrackItem[@"length"] = @(self.itemLayout.autoAssociationCellRect.size.width);
             [destinationTrackItems insertObject:sourceTrackItem atIndex:self.destinationRowOfDraggingItem];
             /**
-             self.tracksArray 是否需要过滤一下，去掉空的数组？
-             另外：是否需要更新字典内容？
+             
              */
             [self.tracksArray replaceObjectAtIndex:self.draggingIndexPath.section withObject:sourceTrackItems];
             if (self.draggingIndexPath.section != self.destinationSectionOfDraggingItem) {

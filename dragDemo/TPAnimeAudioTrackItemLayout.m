@@ -13,6 +13,9 @@
 @property (nonatomic, strong) NSMutableDictionary <NSIndexPath *, UICollectionViewLayoutAttributes *> *layoutItemIndexAttrMap;
 //牺牲点空间换取时间。
 @property (nonatomic, strong) NSMutableDictionary <NSNumber *, NSMutableArray<UICollectionViewLayoutAttributes *> *> *layoutItemSectionAttrsMap;
+
+@property (nonatomic, assign) CGRect associationCellFrame;
+
 @end
 
 @implementation TPAnimeAudioTrackItemLayout
@@ -45,8 +48,12 @@
 
 - (UICollectionViewLayoutAttributes *)layoutAttributesForItemAtIndexPath:(NSIndexPath *)indexPath {
     UICollectionViewLayoutAttributes *atti = [UICollectionViewLayoutAttributes layoutAttributesForCellWithIndexPath:indexPath];
-    CGRect itemFrame = [self.delegate layoutItemFrameAtIndexPath:indexPath];
+    NSIndexPath *sourceIndexPath = [self.delegate sourceIndexPathOfDraggingItem];
     if ([self.delegate isAutoAssociationInSection:indexPath.section]) {
+        /**
+         这里是自动联想占位图的布局
+         */
+        CGRect soureItemFrame = [self.delegate layoutItemFrameAtIndexPath:sourceIndexPath];
         CGPoint currentDraggingPoint = [self.delegate currentCGPointOfDraggingItem];
         
         NSIndexPath *draggingIndexPath = [self.collectionView indexPathForItemAtPoint:currentDraggingPoint];
@@ -55,23 +62,26 @@
             draggingIndexPath = [self nearestIndexPathForLayoutItemAtPoint:currentDraggingPoint];
         }
         
-        float autoAssociationViewX = currentDraggingPoint.x - itemFrame.size.width/2.f;
+        float autoAssociationViewX = currentDraggingPoint.x - soureItemFrame.size.width/2.f;
         UICollectionViewLayoutAttributes *preAttri = self.layoutItemIndexAttrMap[draggingIndexPath];
         BOOL placeHolderXOccupied = NO;
-        if (draggingIndexPath.row == [self.delegate numberOfRow4TrackItemLayoutInSection:draggingIndexPath.section] -1) {
+        if ((draggingIndexPath.row == [self.delegate numberOfRow4TrackItemLayoutInSection:draggingIndexPath.section] -1) && draggingIndexPath != sourceIndexPath) {
             placeHolderXOccupied = autoAssociationViewX < (preAttri.frame.origin.x + preAttri.size.width);
         }
         //判断当前x是否有cell占用，yes:寻找当前section最近可用的。 no：使用当前位置
         if (placeHolderXOccupied) {
-            atti.frame = CGRectMake(preAttri.frame.origin.x + preAttri.size.width, draggingIndexPath.section * itemFrame.size.height, itemFrame.size.width, itemFrame.size.height);
+            atti.frame = CGRectMake(preAttri.frame.origin.x + preAttri.size.width, draggingIndexPath.section * soureItemFrame.size.height, soureItemFrame.size.width, soureItemFrame.size.height);
         }else {
-            atti.frame = CGRectMake(autoAssociationViewX, draggingIndexPath.section * itemFrame.size.height, itemFrame.size.width, itemFrame.size.height);
+            atti.frame = CGRectMake(autoAssociationViewX, draggingIndexPath.section * soureItemFrame.size.height, soureItemFrame.size.width, soureItemFrame.size.height);
         }
+        NSLog(@"associationCellFrame=%@", NSStringFromCGRect(atti.frame));
+        self.associationCellFrame = atti.frame;
         atti.zIndex = 2;
-        atti.alpha = [self.delegate sourceIndexPathOfDraggingItem] ? 1.f : 0.f;
+        atti.alpha = sourceIndexPath ? 1.f : 0.f;
     }else {
-        atti.frame = itemFrame;
-        if ([self.delegate sourceIndexPathOfDraggingItem] == indexPath) {
+        //这里是元素cell布局。（音频元素etc）
+        atti.frame = [self.delegate layoutItemFrameAtIndexPath:indexPath];
+        if (sourceIndexPath == indexPath) {
             //处于拖拽状态的item在原位置隐藏起来。
             atti.alpha = 0.f;
         }else {
@@ -82,6 +92,10 @@
 }
 
 #pragma mark - Getter
+- (CGRect)autoAssociationCellRect {
+    return self.associationCellFrame;
+}
+
 - (NSMutableArray *)layoutItemAttrs {
     if (!_layoutItemAttrs) {
         _layoutItemAttrs = [NSMutableArray array];

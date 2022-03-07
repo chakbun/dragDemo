@@ -29,6 +29,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, weak) id<TPAnimeAudioTrackItemLayoutDelegate> delegate;
 
+@property (nonatomic, readonly) CGRect autoAssociationCellRect;
+
 - (NSIndexPath *)nearestIndexPathForLayoutItemAtPoint:(CGPoint)point;
 
 @end
