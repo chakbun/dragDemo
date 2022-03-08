@@ -58,8 +58,19 @@
         /**
          这里是自动联想占位图的布局
          assCell = 自动联想cell。
+         
          ### 1 同一行拖动
-         => 1.1 没有改变当前数组顺序（indexpath不变）：判断点击cell 的 pre right 和 next left；
+         => 1.1 最近的 nearest Cell 改变了 ？
+         ==> 1.1.1 否，往左 ⬅️ or右 ➡️ 移动 ？
+         ===> 1.1.1.1 左👈，nearest Cell  的左边存在 pre cell ？
+         ====> 1.1.1.1.1 是 ，assCell left < pre cell right ? Y=> assCell left == pre cell right，N=> assCell center = 手指点x。
+         ====> 1.1.1.1.2 否，assCell left > 0 ? Y=> assCell center = 手指点x，N=> assCell left = 0;
+         ===> 1.1.1.2 右👉，nearest Cell  的右边存在 next cell ？
+         ====> 1.1.1.2.1 是 ，assCell right > next cell left ? Y=> assCell right ==  next cell left，N=> assCell center = 手指点x。
+         ====> 1.1.1.2.2 否，好像没有限制。
+
+         
+         ==> 1.1.2 是，
          => 1.2 改变了当前数组顺序（indexpath 改变）
          ==> 1.2.1 与cell重合 ，判断当前触碰点与位于重合cell中点位置。
          ===> 1.2.1.1 位于中点左边 👈，判断重合cell left 是否有足够空间（或切割）；
@@ -69,7 +80,7 @@
          ### 2 跨行拖动
          => 2.1 目标行有元素？
          ==> 2.1.1 无，直接在当前行移动。
-         ==> 2.1.2 有，手指点x 最近的 nearest Cell 左 or 右 ？
+         ==> 2.1.2 有，手指点x 最近的 nearest Cell 左 ⬅️ or右 ➡️ ？
          ===> 2.1.2.1  左 👈， nearest Cell  的左边 存在 pre cell ？
          ====> 2.1.2.1.1 是，两 cell 之间是否够空间放下音频 ？
          =====> 2.1.2.1.1.1 否，大于最小音频单位 ？Y=> 裁剪，N=> 不允许移动到这里。
@@ -87,14 +98,7 @@
          =====> 2.1.2.2.1.2 是，手指点x 与 nearest Cell 之间是否够空间放下（音频/2） ？PS: 音频/2 => 手指点x是中心。
          ======> 2.1.2.2.1.2.1 否，assCell left = nearest Cell right。
          ======> 2.1.2.2.1.2.2 是，assCell center = 手指点x。
-         ====> 2.1.2.2.2 否，nearest Cell  右边是否够空间放下音频 ？好似一定会够的。
-
-
-
-
-
-
-         
+         ====> 2.1.2.2.2 否， assCell left < nearest cell right ? Y=> assCell left == nearest cell right，N=> assCell center = 手指点x。
          */
         CGPoint currentThumbPoint = [self.delegate currentCGPointOfDraggingItem];
         UICollectionViewLayoutAttributes *sourceItemAttri = self.layoutItemIndexAttrMap[sourceIndexPath];
@@ -114,7 +118,9 @@
         if (nearestItemAttri) {
             NSIndexPath *preIndexPath = previousIndexPath(nearestIndexPath);
             NSIndexPath *nexIndexPath = nextIndexPathOf(nearestIndexPath);
-            preItemAttri = self.layoutItemIndexAttrMap[preIndexPath];
+            if (preIndexPath) {
+                preItemAttri = self.layoutItemIndexAttrMap[preIndexPath];
+            }
             nexItemAttri = self.layoutItemIndexAttrMap[nexIndexPath];
         }
         
@@ -256,24 +262,29 @@
                     }
                 }
             }else {
-                //case 1.2
-                if (preItemAttri) {
-                    borderLeft = rightOfRect(preItemAttri.frame);
-                }
-                if (nexItemAttri) {
-                    borderRight = leftOfRect(nexItemAttri.frame);
-                }
-                if (borderLeft != TPAnimeAudioTrackItemLayoutBorderUnlimited && autoAssociationViewLeft <= borderLeft) {
-                    autoAssociationViewLeft = borderLeft;
-                    //判断是否放得下。
-                    if((borderRight - borderLeft < autoAssociationViewWidth) && (borderRight != TPAnimeAudioTrackItemLayoutBorderUnlimited)) {
-                        autoAssociationViewWidth = borderRight - borderLeft;
+                //==> 1.1.1 否，往左 ⬅️ or右 ➡️ 移动 ？
+                if (currentThumbPoint.x < centerXOfRect(sourceItemAttri.frame)) {
+                    //===> 1.1.1.1 左👈，nearest Cell  的左边存在 pre cell ？
+                    if (preItemAttri) {
+                        if (autoAssociationViewLeft < rightOfRect(preItemAttri.frame)) {
+                            autoAssociationViewLeft = rightOfRect(preItemAttri.frame);
+                        }
+                    }else {
+                        if (autoAssociationViewLeft < 0) {
+                            autoAssociationViewLeft = 0;
+                        }
                     }
-                }else if(borderRight != TPAnimeAudioTrackItemLayoutBorderUnlimited && autoAssociationViewRight > borderRight){
-                    autoAssociationViewLeft = borderRight - autoAssociationViewWidth;
+                }else {
+                    //===> 1.1.1.2 右👉，nearest Cell  的右边存在 next cell ？
+                    if (nexItemAttri) {
+                        if (autoAssociationViewRight > leftOfRect(nexItemAttri.frame)) {
+                            autoAssociationViewLeft = leftOfRect(nexItemAttri.frame) - autoAssociationViewWidth;
+                        }
+                    }else {
+                        
+                    }
                 }
             }
-            
             autoAssociationViewTop = topOfRect(sourceItemAttri.frame);
 
         }else {
@@ -331,7 +342,7 @@
                             //=====> 2.1.2.2.1.1 否，大于最小音频单位 ？Y=> 裁剪，N=> 不允许移动到这里。
                             if (gapWidth > 0) {
                                 autoAssociationViewWidth = gapWidth;
-                                autoAssociationViewLeft = rightOfRect(nextNearAttri.frame);
+                                autoAssociationViewLeft = rightOfRect(nearestItemAttri.frame);
                             }else {
                                 self.indexPathChangeable = NO;
                             }
@@ -341,7 +352,11 @@
                             autoAssociationViewLeft = rightOfRect(nearestItemAttri.frame);
                         }
                     }else {
-                        //====> 2.1.2.2.2 否，nearest Cell  右边是否够空间放下音频 ？好似一定会够的。
+                        //====> 2.1.2.2.2 否， assCell left < nearest cell right ? Y=> assCell left == nearest cell right，N=> assCell center = 手指点x。
+                        if (autoAssociationViewLeft < rightOfRect(nearestItemAttri.frame)) {
+                            autoAssociationViewLeft = rightOfRect(nearestItemAttri.frame);
+                        }
+                        
                     }
                 }
                 
