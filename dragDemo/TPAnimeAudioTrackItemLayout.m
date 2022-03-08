@@ -72,16 +72,25 @@
          => 2.1
          */
         CGPoint currentThumbPoint = [self.delegate currentCGPointOfDraggingItem];
-        NSIndexPath *nearestIndexPath = [self nearestIndexPathForLayoutItemAtPoint:currentThumbPoint];
+        UICollectionViewLayoutAttributes *sourceItemAttri = self.layoutItemIndexAttrMap[sourceIndexPath];
         
+        NSIndexPath *nearestIndexPath = [self nearestIndexPathForLayoutItemAtPoint:currentThumbPoint];
+        UICollectionViewLayoutAttributes *nearestItemAttri = self.layoutItemIndexAttrMap[nearestIndexPath];
+        if ([self.delegate isAutoAssociationInSection:nearestIndexPath.section]) {
+            nearestItemAttri = nil;
+        }
+
         BOOL draggingIndexPathChanged = nearestIndexPath != sourceIndexPath;
         NSLog(@"draggingIndexPathChanged = %i", draggingIndexPathChanged);
-        NSIndexPath *preIndexPath = previousIndexPath(nearestIndexPath);
-        NSIndexPath *nexIndexPath = nextIndexPathOf(nearestIndexPath);
-        UICollectionViewLayoutAttributes *sourceItemAttri = self.layoutItemIndexAttrMap[sourceIndexPath];
-        UICollectionViewLayoutAttributes *nearestItemAttri = self.layoutItemIndexAttrMap[nearestIndexPath];
-        UICollectionViewLayoutAttributes *preItemAttri = self.layoutItemIndexAttrMap[preIndexPath];
-        UICollectionViewLayoutAttributes *nexItemAttri = self.layoutItemIndexAttrMap[nexIndexPath];
+        
+        UICollectionViewLayoutAttributes *preItemAttri = nil;
+        UICollectionViewLayoutAttributes *nexItemAttri = nil;
+        if (nearestItemAttri) {
+            NSIndexPath *preIndexPath = previousIndexPath(nearestIndexPath);
+            NSIndexPath *nexIndexPath = nextIndexPathOf(nearestIndexPath);
+            preItemAttri = self.layoutItemIndexAttrMap[preIndexPath];
+            nexItemAttri = self.layoutItemIndexAttrMap[nexIndexPath];
+        }
         
         float autoAssociationViewLeft = currentThumbPoint.x - widthOfRect(sourceItemAttri.frame)/2.f;
         float autoAssociationViewRight = currentThumbPoint.x + widthOfRect(sourceItemAttri.frame)/2.f;
@@ -185,14 +194,9 @@
                                     autoAssociationViewLeft = leftOfRect(overLapAttri.frame) - autoAssociationViewWidth;
                                 }
                             }else {
-                                //不存在，所以 preOverLapIndexPath 是第一个元素。
-                                if (leftOfRect(overLapAttri.frame) > 0) {
-                                    if (leftOfRect(overLapAttri.frame) < autoAssociationViewWidth) {
-                                        autoAssociationViewWidth = leftOfRect(overLapAttri.frame); //case:x=0;
-                                    }
-                                    autoAssociationViewLeft = rightOfRect(preOverLapAttri.frame) - autoAssociationViewWidth;
-                                }else {
-                                    self.indexPathChangeable = NO;
+                                //可能是自己（preOverLapIndexPath == sourceIndexPath）
+                                if (currentThumbPoint.x - leftOfRect(overLapAttri.frame) <= autoAssociationViewWidth) {
+                                    autoAssociationViewLeft = leftOfRect(overLapAttri.frame) - autoAssociationViewWidth;
                                 }
                             }
                         }else {
@@ -235,7 +239,7 @@
                 if (borderLeft != TPAnimeAudioTrackItemLayoutBorderUnlimited && autoAssociationViewLeft <= borderLeft) {
                     autoAssociationViewLeft = borderLeft;
                     //判断是否放得下。
-                    if(borderRight - borderLeft < autoAssociationViewWidth) {
+                    if((borderRight - borderLeft < autoAssociationViewWidth) && (borderRight != TPAnimeAudioTrackItemLayoutBorderUnlimited)) {
                         autoAssociationViewWidth = borderRight - borderLeft;
                     }
                 }else if(borderRight != TPAnimeAudioTrackItemLayoutBorderUnlimited && autoAssociationViewRight > borderRight){
@@ -247,8 +251,15 @@
 
         }else {
             //diff section
-            
+
+
+
+
         }
+        
+//        if (currentThumbPoint.y < topOfRect(sourceItemAttri.frame) || currentThumbPoint.y >= bottomOfRect(sourceItemAttri.frame)) {
+//            autoAssociationViewTop = topOfRect(nearestItemAttri.frame);
+//        }
         
         atti.frame = CGRectMake(autoAssociationViewLeft, autoAssociationViewTop, autoAssociationViewWidth, heightOfRect(sourceItemAttri.frame));
     
@@ -305,6 +316,11 @@
     CGRect itemFrame = [self.delegate layoutItemFrameAtIndexPath:sourceIndexPath];
     NSInteger pointInSection = ceilf(point.y / itemFrame.size.height) - 1;
     pointInSection = MAX(0, pointInSection);
+    
+    if([self.delegate isAutoAssociationInSection:pointInSection]) {
+        return [NSIndexPath indexPathForRow:0 inSection:pointInSection];
+    }
+
     NSArray *attrsInSection = self.layoutItemSectionAttrsMap[@(pointInSection)];
     NSInteger pointInNearestRow = getRowByBinaryCheck(attrsInSection, point.x);
 
