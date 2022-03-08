@@ -62,8 +62,6 @@
 
          ### 1 同一行拖动
          => 1.1 没有改变当前数组顺序（indexpath不变）：判断点击cell 的 pre right 和 next left；
-         ==> 1.1.1 判断重合 fuck
-         
          => 1.2 改变了当前数组顺序（indexpath 改变）
          ==> 1.2.1 与cell重合 ，判断当前触碰点与位于重合cell中点位置。
          ===> 1.2.1.1 位于中点左边 👈，判断重合cell left 是否有足够空间（或切割）；
@@ -106,13 +104,16 @@
                 //case 1.2
                 if (nearestIndexPath.row < sourceIndexPath.row) {
                     //drag to left
-                    if(rightOfRect(nearestItemAttri.frame) > currentThumbPoint.x) {
+                    if(rightOfRect(nearestItemAttri.frame) > autoAssociationViewLeft) {
                         // case 1.2.1 重合
                         overLapIndexPath = nearestIndexPath;
                         UICollectionViewLayoutAttributes *overLapAttri = nearestItemAttri;
                         if (currentThumbPoint.x < centerXOfRect(overLapAttri.frame)) {
                             NSIndexPath *preOverLapIndexPath = previousIndexPath(overLapIndexPath);
-                            UICollectionViewLayoutAttributes *preOverLapAttri = self.layoutItemIndexAttrMap[preOverLapIndexPath];
+                            UICollectionViewLayoutAttributes *preOverLapAttri = nil;
+                            if (preOverLapIndexPath != sourceIndexPath) {
+                                preOverLapAttri = self.layoutItemIndexAttrMap[preOverLapIndexPath];
+                            }
                             if (preOverLapAttri) {
                                 float gapWidth = leftOfRect(overLapAttri.frame) - rightOfRect(preOverLapAttri.frame);
                                 if (gapWidth < autoAssociationViewWidth) {
@@ -163,8 +164,63 @@
                     }
                 }else {
                     //drag to right
-                    if(leftOfRect(nearestItemAttri.frame) < currentThumbPoint.x) {
+                    if(leftOfRect(nearestItemAttri.frame) < autoAssociationViewLeft + autoAssociationViewWidth) {
                         //重合
+                        overLapIndexPath = nearestIndexPath;
+                        UICollectionViewLayoutAttributes *overLapAttri = nearestItemAttri;
+                        if (currentThumbPoint.x < centerXOfRect(overLapAttri.frame)) {
+                            NSIndexPath *preOverLapIndexPath = previousIndexPath(overLapIndexPath);
+                            UICollectionViewLayoutAttributes *preOverLapAttri = nil;
+                            if (preOverLapIndexPath != sourceIndexPath) {
+                                preOverLapAttri = self.layoutItemIndexAttrMap[preOverLapIndexPath];
+                            }
+                            if (preOverLapAttri) {
+                                float gapWidth = leftOfRect(overLapAttri.frame) - rightOfRect(preOverLapAttri.frame);
+                                if (gapWidth < autoAssociationViewWidth) {
+                                    //放不下->裁剪。
+                                    autoAssociationViewWidth = gapWidth;
+                                    autoAssociationViewLeft = leftOfRect(overLapAttri.frame) - autoAssociationViewWidth;
+                                }else if(leftOfRect(overLapAttri.frame) - currentThumbPoint.x < autoAssociationViewWidth) {
+                                    //放得下，但是当前触碰起点放不下，需要改变left。
+                                    autoAssociationViewLeft = leftOfRect(overLapAttri.frame) - autoAssociationViewWidth;
+                                }
+                            }else {
+                                //不存在，所以 preOverLapIndexPath 是第一个元素。
+                                if (leftOfRect(overLapAttri.frame) > 0) {
+                                    if (leftOfRect(overLapAttri.frame) < autoAssociationViewWidth) {
+                                        autoAssociationViewWidth = leftOfRect(overLapAttri.frame); //case:x=0;
+                                    }
+                                    autoAssociationViewLeft = rightOfRect(preOverLapAttri.frame) - autoAssociationViewWidth;
+                                }else {
+                                    self.indexPathChangeable = NO;
+                                }
+                            }
+                        }else {
+                            NSIndexPath *nexOverLapIndexPath = nextIndexPathOf(overLapIndexPath);
+                            UICollectionViewLayoutAttributes *nexOverLapAttri = nil;
+                            if (nexOverLapIndexPath != sourceIndexPath) {
+                                nexOverLapAttri = self.layoutItemIndexAttrMap[nexOverLapIndexPath];
+                            }
+                            if (nexOverLapAttri) {
+                                //存在下一个，判断是否放得下。
+                                float gapWidth = leftOfRect(nexOverLapAttri.frame) - rightOfRect(overLapAttri.frame);
+                                if (gapWidth < autoAssociationViewWidth) {
+                                    //放不下->裁剪。
+                                    autoAssociationViewWidth = gapWidth;
+                                    autoAssociationViewLeft = rightOfRect(overLapAttri.frame);
+                                }else if(currentThumbPoint.x - rightOfRect(overLapAttri.frame) < autoAssociationViewWidth){
+                                    //放得下，但是当前触碰起点放不下，需要改变left。
+                                    autoAssociationViewLeft = rightOfRect(overLapAttri.frame);
+                                }
+                            }else {
+                                autoAssociationViewLeft = rightOfRect(overLapAttri.frame);
+                            }
+                        }
+                    }else {
+                        // 不重合
+                        if (autoAssociationViewLeft < (leftOfRect(nearestItemAttri.frame) - autoAssociationViewWidth)) {
+                            autoAssociationViewLeft = leftOfRect(nearestItemAttri.frame) - autoAssociationViewWidth;
+                        }
                         
                     }
                 }
