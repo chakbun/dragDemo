@@ -31,9 +31,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, readonly) CGRect autoAssociationCellRect;
 
-@property (nonatomic, readonly) NSInteger autoAssociationInsertPosition;
-
 - (NSIndexPath *)nearestIndexPathForLayoutItemAtPoint:(CGPoint)point;
+
+- (NSInteger)fixTargeRowWithSection:(NSInteger)section row:(NSInteger)row;
 
 @end
 

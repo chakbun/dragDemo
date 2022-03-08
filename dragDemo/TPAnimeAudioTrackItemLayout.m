@@ -19,8 +19,6 @@
 
 @property (nonatomic, assign) CGRect associationCellFrame;
 
-@property (nonatomic, assign) NSInteger compareIndexPathPosition;
-
 @property (nonatomic, assign) BOOL indexPathChangeable;
 
 @end
@@ -69,19 +67,23 @@
          ==> 1.2.2 与cell不重合：判断同 1.1；
          
          ### 2 非同一行
-         => 2.1
+         => 2.1 目标行是否有元素 ？
+         ==> 2.1.1 没有，直接在当前行移动。
+         ==> 2.1.2 有。 大致同上 1.2
+         
          */
         CGPoint currentThumbPoint = [self.delegate currentCGPointOfDraggingItem];
         UICollectionViewLayoutAttributes *sourceItemAttri = self.layoutItemIndexAttrMap[sourceIndexPath];
         
         NSIndexPath *nearestIndexPath = [self nearestIndexPathForLayoutItemAtPoint:currentThumbPoint];
+//        NSLog(@"nearestIndexPath=%@",nearestIndexPath.description);
         UICollectionViewLayoutAttributes *nearestItemAttri = self.layoutItemIndexAttrMap[nearestIndexPath];
         if ([self.delegate isAutoAssociationInSection:nearestIndexPath.section]) {
             nearestItemAttri = nil;
         }
 
         BOOL draggingIndexPathChanged = nearestIndexPath != sourceIndexPath;
-        NSLog(@"draggingIndexPathChanged = %i", draggingIndexPathChanged);
+        BOOL lastItemInSection = (nearestIndexPath.row == [self.delegate numberOfRow4TrackItemLayoutInSection:nearestIndexPath.section] -1 );
         
         UICollectionViewLayoutAttributes *preItemAttri = nil;
         UICollectionViewLayoutAttributes *nexItemAttri = nil;
@@ -114,7 +116,7 @@
                 if (nearestIndexPath.row < sourceIndexPath.row) {
                     //drag to left
                     if(rightOfRect(nearestItemAttri.frame) > autoAssociationViewLeft) {
-                        // case 1.2.1 重合
+                        // case 1.2.1 重合了
                         overLapIndexPath = nearestIndexPath;
                         UICollectionViewLayoutAttributes *overLapAttri = nearestItemAttri;
                         if (currentThumbPoint.x < centerXOfRect(overLapAttri.frame)) {
@@ -145,6 +147,7 @@
                                 }
                             }
                         }else {
+                            //这里可能在最靠近cell的右边。
                             NSIndexPath *nexOverLapIndexPath = nextIndexPathOf(overLapIndexPath);
                             UICollectionViewLayoutAttributes *nexOverLapAttri = nil;
                             if (nexOverLapIndexPath != sourceIndexPath) {
@@ -173,7 +176,7 @@
                     }
                 }else {
                     //drag to right
-                    if(leftOfRect(nearestItemAttri.frame) < autoAssociationViewLeft + autoAssociationViewWidth) {
+                    if((leftOfRect(nearestItemAttri.frame) < autoAssociationViewLeft + autoAssociationViewWidth) && (currentThumbPoint.x < rightOfRect(nearestItemAttri.frame))) {
                         //重合
                         overLapIndexPath = nearestIndexPath;
                         UICollectionViewLayoutAttributes *overLapAttri = nearestItemAttri;
@@ -251,15 +254,13 @@
 
         }else {
             //diff section
-
-
-
-
+            if (nearestItemAttri) {
+                autoAssociationViewTop = topOfRect(nearestItemAttri.frame);
+            }else {
+                //case 2.1.1
+                autoAssociationViewTop = heightOfRect([self frameOfDraggingItem]) * nearestIndexPath.section;
+            }
         }
-        
-//        if (currentThumbPoint.y < topOfRect(sourceItemAttri.frame) || currentThumbPoint.y >= bottomOfRect(sourceItemAttri.frame)) {
-//            autoAssociationViewTop = topOfRect(nearestItemAttri.frame);
-//        }
         
         atti.frame = CGRectMake(autoAssociationViewLeft, autoAssociationViewTop, autoAssociationViewWidth, heightOfRect(sourceItemAttri.frame));
     
@@ -281,10 +282,6 @@
 }
 
 #pragma mark - Getter
-- (NSInteger)autoAssociationInsertPosition {
-    return self.compareIndexPathPosition;
-}
-
 - (CGRect)autoAssociationCellRect {
     return self.associationCellFrame;
 }
@@ -311,9 +308,56 @@
 }
 
 #pragma mark - Public
-- (NSIndexPath *)nearestIndexPathForLayoutItemAtPoint:(CGPoint)point {
+- (NSInteger)fixTargeRowWithSection:(NSInteger)section row:(NSInteger)row {
+    /**
+     由于 nearestIndexPath 使用最靠近的 cell 会出现偏差。这里需要做插入的修正。
+     */
+    
+    NSIndexPath *cIndexPath = [NSIndexPath indexPathForRow:row inSection:section];
+    NSIndexPath *pIndexPath = nil;
+    if (row > 0) {
+        pIndexPath = [NSIndexPath indexPathForRow:row-1 inSection:section];
+    }
+    NSIndexPath *nIndexPath = [NSIndexPath indexPathForRow:row+1 inSection:section];
+    
+    UICollectionViewLayoutAttributes *cAttri = self.layoutItemIndexAttrMap[cIndexPath];
+    UICollectionViewLayoutAttributes *nAttri = self.layoutItemIndexAttrMap[nIndexPath];
+    
+    UICollectionViewLayoutAttributes *pAttri = nil;
+    if (pIndexPath) {
+        pAttri = self.layoutItemIndexAttrMap[pIndexPath];
+    }
+    
+    if (pAttri) {
+        if(rightOfRect(pAttri.frame) > self.autoAssociationCellRect.origin.x) {
+            return pIndexPath.row;
+        }
+    }
+    
+    if (cAttri) {
+        if(rightOfRect(cAttri.frame) > self.autoAssociationCellRect.origin.x) {
+            return cIndexPath.row;
+        }
+    }
+    
+    if (nAttri) {
+        if(rightOfRect(nAttri.frame) > self.autoAssociationCellRect.origin.x) {
+            return nIndexPath.row;
+        }
+    }
+    
+    return row;
+    
+}
+
+- (CGRect)frameOfDraggingItem {
     NSIndexPath *sourceIndexPath = [self.delegate sourceIndexPathOfDraggingItem];
     CGRect itemFrame = [self.delegate layoutItemFrameAtIndexPath:sourceIndexPath];
+    return itemFrame;
+}
+
+- (NSIndexPath *)nearestIndexPathForLayoutItemAtPoint:(CGPoint)point {
+    CGRect itemFrame = [self frameOfDraggingItem];
     NSInteger pointInSection = ceilf(point.y / itemFrame.size.height) - 1;
     pointInSection = MAX(0, pointInSection);
     

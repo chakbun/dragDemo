@@ -42,9 +42,11 @@
         
         self.tracksInfoDic = [@{
             @"track_1": @[
-                              @{@"name": @"audio1", @"color": [UIColor redColor], @"location": @0, @"length": @100},
-                              @{@"name": @"audio2", @"color": [UIColor greenColor], @"location": @130, @"length": @100},
-                              @{@"name": @"audio3", @"color": [UIColor blueColor], @"location": @300, @"length": @100},
+                              @{@"name": @"audio1", @"color": [UIColor redColor], @"location": @0, @"length": @30},
+                              @{@"name": @"audio2", @"color": [UIColor greenColor], @"location": @50, @"length": @40},
+                              @{@"name": @"audio3", @"color": [UIColor blueColor], @"location": @100, @"length": @50},
+                              @{@"name": @"audio4", @"color": [UIColor orangeColor], @"location": @170, @"length": @50},
+
             ],
 //            @"track_2": @[@{@"name": @"audio2", @"color": [UIColor greenColor], @"location": @20, @"length": @100}],
 //            @"track_3": @[@{@"name": @"audio3", @"color": [UIColor blueColor], @"location": @30, @"length": @100}],
@@ -182,7 +184,11 @@
             NSMutableArray *sourceTrackItems = [self.tracksArray[self.draggingIndexPath.section] mutableCopy];
             NSMutableArray *destinationTrackItems = sourceTrackItems;
             if (self.draggingIndexPath.section != self.destinationSectionOfDraggingItem) {
-                destinationTrackItems = [self.tracksArray[self.destinationSectionOfDraggingItem] mutableCopy];
+                if (self.destinationSectionOfDraggingItem < self.tracksArray.count) {
+                    destinationTrackItems = [self.tracksArray[self.destinationSectionOfDraggingItem] mutableCopy];
+                }else {
+                    destinationTrackItems = [NSMutableArray array];
+                }
             }
             
             NSMutableDictionary *sourceTrackItem = [sourceTrackItems[self.draggingIndexPath.row] mutableCopy];
@@ -192,18 +198,16 @@
             
             sourceTrackItem[@"location"] = @(self.itemLayout.autoAssociationCellRect.origin.x);
             sourceTrackItem[@"length"] = @(self.itemLayout.autoAssociationCellRect.size.width);
-            if (self.itemLayout.autoAssociationInsertPosition == 0) {
-                if (self.draggingIndexPath.section != self.destinationSectionOfDraggingItem) {
-                    self.destinationRowOfDraggingItem =+1;
-                }
-                if (destinationTrackItems.count < self.destinationRowOfDraggingItem) {
-                    self.destinationRowOfDraggingItem = destinationTrackItems.count;
-                }
-                [destinationTrackItems insertObject:sourceTrackItem atIndex:self.destinationRowOfDraggingItem];
-
-            }else {
-                [destinationTrackItems insertObject:sourceTrackItem atIndex:self.destinationRowOfDraggingItem-1];
+            
+            //修正处理。
+            NSInteger insertIndex = [self.itemLayout fixTargeRowWithSection:self.destinationSectionOfDraggingItem row:self.destinationRowOfDraggingItem];
+            if (destinationTrackItems.count < insertIndex) {
+                insertIndex = destinationTrackItems.count;
             }
+            [destinationTrackItems insertObject:sourceTrackItem atIndex:insertIndex];
+            NSLog(@"destinationRowOfDraggingItem:%@, insert to:%@", @(self.destinationRowOfDraggingItem), @(insertIndex));
+            NSLog(@"destinationTrackItems=%@", destinationTrackItems);
+
             [self.tracksArray replaceObjectAtIndex:self.draggingIndexPath.section withObject:sourceTrackItems];
             if (self.draggingIndexPath.section != self.destinationSectionOfDraggingItem) {
                 [self.tracksArray replaceObjectAtIndex:self.destinationSectionOfDraggingItem withObject:destinationTrackItems];
