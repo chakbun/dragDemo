@@ -210,7 +210,11 @@
 
             [self.tracksArray replaceObjectAtIndex:self.draggingIndexPath.section withObject:sourceTrackItems];
             if (self.draggingIndexPath.section != self.destinationSectionOfDraggingItem) {
-                [self.tracksArray replaceObjectAtIndex:self.destinationSectionOfDraggingItem withObject:destinationTrackItems];
+                if (self.destinationSectionOfDraggingItem < self.tracksArray.count) {
+                    [self.tracksArray replaceObjectAtIndex:self.destinationSectionOfDraggingItem withObject:destinationTrackItems];
+                }else {
+                    [self.tracksArray addObject:destinationTrackItems];
+                }
             }
             self.draggingIndexPath = nil;
             [self.draggingThumbView removeFromSuperview];
