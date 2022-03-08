@@ -76,7 +76,7 @@
         UICollectionViewLayoutAttributes *sourceItemAttri = self.layoutItemIndexAttrMap[sourceIndexPath];
         
         NSIndexPath *nearestIndexPath = [self nearestIndexPathForLayoutItemAtPoint:currentThumbPoint];
-//        NSLog(@"nearestIndexPath=%@",nearestIndexPath.description);
+        NSLog(@"nearestIndexPath=%@",nearestIndexPath.description);
         UICollectionViewLayoutAttributes *nearestItemAttri = self.layoutItemIndexAttrMap[nearestIndexPath];
         if ([self.delegate isAutoAssociationInSection:nearestIndexPath.section]) {
             nearestItemAttri = nil;
@@ -98,7 +98,7 @@
         float autoAssociationViewRight = currentThumbPoint.x + widthOfRect(sourceItemAttri.frame)/2.f;
         float autoAssociationViewTop = currentThumbPoint.y;
         float autoAssociationViewWidth = widthOfRect(sourceItemAttri.frame);
-
+        
         float borderLeft = TPAnimeAudioTrackItemLayoutBorderUnlimited;
         float borderRight = TPAnimeAudioTrackItemLayoutBorderUnlimited;
         
@@ -255,7 +255,62 @@
         }else {
             //diff section
             if (nearestItemAttri) {
+                //判断 nearestItemAttri 在手指的左边还是右边
+                if(currentThumbPoint.x < centerXOfRect(nearestItemAttri.frame)) {
+                    //左边 👈
+                    UICollectionViewLayoutAttributes *preNearAttri = self.layoutItemIndexAttrMap[previousIndexPath(nearestIndexPath)];
+                    if (preNearAttri) {
+                        //计算是否有位置放下。
+                        float gapWidth = leftOfRect(nearestItemAttri.frame) - rightOfRect(preNearAttri.frame);
+                        if (gapWidth < autoAssociationViewWidth) {
+                            autoAssociationViewWidth = gapWidth;
+                            autoAssociationViewLeft = rightOfRect(preNearAttri.frame);
+                        }else if(currentThumbPoint.x - leftOfRect(nearestItemAttri.frame) < autoAssociationViewWidth/2.f){
+                            autoAssociationViewLeft = leftOfRect(nearestItemAttri.frame) - autoAssociationViewWidth;
+                        }
+                    }else {
+                        //不存在，所以 nearestIndexPath 是第一个元素。
+                        if (leftOfRect(nearestItemAttri.frame) > 0) {
+                            if (leftOfRect(nearestItemAttri.frame) < autoAssociationViewWidth) {
+                                autoAssociationViewWidth = leftOfRect(nearestItemAttri.frame); //case:x=0;
+                                autoAssociationViewLeft = 0;
+                            }else {
+                                if (leftOfRect(nearestItemAttri.frame) - currentThumbPoint.x < autoAssociationViewWidth/2.f) {
+                                    autoAssociationViewLeft = leftOfRect(nearestItemAttri.frame) - autoAssociationViewWidth;
+                                }
+                            }
+                        }else {
+                            self.indexPathChangeable = NO;
+                        }
+                    }
+                    if (leftOfRect(nearestItemAttri.frame) < autoAssociationViewRight) {
+                        autoAssociationViewLeft = leftOfRect(nearestItemAttri.frame) - autoAssociationViewWidth;
+                    }
+                }else {
+                    //右边 👉
+                    UICollectionViewLayoutAttributes *nextNearAttri = self.layoutItemIndexAttrMap[nextIndexPathOf(nearestIndexPath)];
+                    if (nextNearAttri) {
+                        //计算是否有位置放下。
+                        float gapWidth = leftOfRect(nextNearAttri.frame) - rightOfRect(nextNearAttri.frame);
+                        if(gapWidth < autoAssociationViewWidth) {
+                            autoAssociationViewWidth = gapWidth;
+                            autoAssociationViewLeft = rightOfRect(nextNearAttri.frame);
+                        }else if((leftOfRect(nextNearAttri.frame) - currentThumbPoint.x) < autoAssociationViewWidth/2.f) {
+                            autoAssociationViewLeft = leftOfRect(nextNearAttri.frame);
+                        }
+                    }else {
+                        //不存在，所以 nearestIndexPath 是最后一个元素。
+                        if (rightOfRect(nextNearAttri.frame) > currentThumbPoint.x) {
+                            autoAssociationViewLeft = rightOfRect(nextNearAttri.frame);
+                        }
+                    }
+                    if (rightOfRect(nearestItemAttri.frame) > autoAssociationViewLeft) {
+                        autoAssociationViewLeft = rightOfRect(nearestItemAttri.frame);
+                    }
+                }
+                
                 autoAssociationViewTop = topOfRect(nearestItemAttri.frame);
+
             }else {
                 //case 2.1.1
                 autoAssociationViewTop = heightOfRect([self frameOfDraggingItem]) * nearestIndexPath.section;
