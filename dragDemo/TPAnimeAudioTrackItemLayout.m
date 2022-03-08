@@ -57,7 +57,7 @@
     if ([self.delegate isAutoAssociationInSection:indexPath.section]) {
         /**
          这里是自动联想占位图的布局
-
+         assCell = 自动联想cell。
          ### 1 同一行拖动
          => 1.1 没有改变当前数组顺序（indexpath不变）：判断点击cell 的 pre right 和 next left；
          => 1.2 改变了当前数组顺序（indexpath 改变）
@@ -66,10 +66,34 @@
          ===> 1.2.1.2 位于中点右边 👉，判断重合cell right 是否有足够空间（或切割）；
          ==> 1.2.2 与cell不重合：判断同 1.1；
          
-         ### 2 非同一行
-         => 2.1 目标行是否有元素 ？
-         ==> 2.1.1 没有，直接在当前行移动。
-         ==> 2.1.2 有。 大致同上 1.2
+         ### 2 跨行拖动
+         => 2.1 目标行有元素？
+         ==> 2.1.1 无，直接在当前行移动。
+         ==> 2.1.2 有，手指点x 最近的 nearest Cell 左 or 右 ？
+         ===> 2.1.2.1  左 👈， nearest Cell  的左边 存在 pre cell ？
+         ====> 2.1.2.1.1 是，两 cell 之间是否够空间放下音频 ？
+         =====> 2.1.2.1.1.1 否，大于最小音频单位 ？Y=> 裁剪，N=> 不允许移动到这里。
+         =====> 2.1.2.1.1.2 是，手指点x 与 nearest Cell 之间是否够空间放下（音频/2） ？PS: 音频/2 => 手指点x是中心。
+         ======> 2.1.2.1.1.2.1 否，assCell right = nearest Cell left。
+         ======> 2.1.2.1.1.2.2 是，assCell center = 手指点x。
+         ====> 2.1.2.1.2 否，nearest Cell  左边是否够空间放下音频 ？
+         =====> 2.1.2.1.2.1 否，大于最小音频单位 ？Y=> 裁剪，N=> 不允许移动到这里。
+         =====> 2.1.2.1.2.2 是，手指点x 与 nearest Cell 之间是否够空间放下音频 ？
+         ======> 2.1.2.1.2.2.1 否，assCell right = nearest Cell left。
+         ======> 2.1.2.1.2.2.2 是，assCell center = 手指点x。
+         ===> 2.1.2.2  右 👉， nearest Cell  的右边 存在 next cell ？
+         ====> 2.1.2.2.1 是，两 cell 之间是否够空间放下音频 ？
+         =====> 2.1.2.2.1.1 否，大于最小音频单位 ？Y=> 裁剪，N=> 不允许移动到这里。
+         =====> 2.1.2.2.1.2 是，手指点x 与 nearest Cell 之间是否够空间放下（音频/2） ？PS: 音频/2 => 手指点x是中心。
+         ======> 2.1.2.2.1.2.1 否，assCell left = nearest Cell right。
+         ======> 2.1.2.2.1.2.2 是，assCell center = 手指点x。
+         ====> 2.1.2.2.2 否，nearest Cell  右边是否够空间放下音频 ？好似一定会够的。
+
+
+
+
+
+
          
          */
         CGPoint currentThumbPoint = [self.delegate currentCGPointOfDraggingItem];
@@ -253,66 +277,77 @@
             autoAssociationViewTop = topOfRect(sourceItemAttri.frame);
 
         }else {
-            //diff section
+            //different section
             if (nearestItemAttri) {
-                //判断 nearestItemAttri 在手指的左边还是右边
+                //==> 2.1.2 有，手指点x 最近的 nearest Cell 左 or 右 ？
                 if(currentThumbPoint.x < centerXOfRect(nearestItemAttri.frame)) {
-                    //左边 👈
+                    //===> 2.1.2.1  左 👈， nearest Cell  的左边 存在 pre cell ？
                     UICollectionViewLayoutAttributes *preNearAttri = self.layoutItemIndexAttrMap[previousIndexPath(nearestIndexPath)];
                     if (preNearAttri) {
-                        //计算是否有位置放下。
+                        //====> 2.1.2.1.1 是，两 cell 之间是否够空间放下音频 ？
                         float gapWidth = leftOfRect(nearestItemAttri.frame) - rightOfRect(preNearAttri.frame);
+                        
                         if (gapWidth < autoAssociationViewWidth) {
-                            autoAssociationViewWidth = gapWidth;
-                            autoAssociationViewLeft = rightOfRect(preNearAttri.frame);
+                            //=====> 2.1.2.1.1 否，大于最小音频单位 ？Y=> 裁剪，N=> 不允许移动到这里。
+                            if (gapWidth > 0) {
+                                autoAssociationViewWidth = gapWidth;
+                                autoAssociationViewLeft = rightOfRect(preNearAttri.frame);
+                            }else {
+                                self.indexPathChangeable = NO;
+                            }
                         }else if(currentThumbPoint.x - leftOfRect(nearestItemAttri.frame) < autoAssociationViewWidth/2.f){
+                            //=====> 2.1.2.1.2 是，手指点x 与 nearest Cell 之间是否够空间放下（音频/2） ？PS: 音频/2 => 手指点x是中心。
+                            //======> 2.1.2.1.2.1 否，assCell right = nearest Cell left。
                             autoAssociationViewLeft = leftOfRect(nearestItemAttri.frame) - autoAssociationViewWidth;
                         }
                     }else {
-                        //不存在，所以 nearestIndexPath 是第一个元素。
-                        if (leftOfRect(nearestItemAttri.frame) > 0) {
-                            if (leftOfRect(nearestItemAttri.frame) < autoAssociationViewWidth) {
-                                autoAssociationViewWidth = leftOfRect(nearestItemAttri.frame); //case:x=0;
+                        //====> 2.1.2.1.2 否，nearest Cell  左边是否够空间放下音频 ？
+                        if (leftOfRect(nearestItemAttri.frame) < autoAssociationViewWidth) {
+                            //=====> 2.1.2.1.2.1 否，大于最小音频单位 ？Y=> 裁剪，N=> 不允许移动到这里。
+                            if (leftOfRect(nearestItemAttri.frame) > 0) {
+                                autoAssociationViewWidth = leftOfRect(nearestItemAttri.frame);
                                 autoAssociationViewLeft = 0;
                             }else {
-                                if (leftOfRect(nearestItemAttri.frame) - currentThumbPoint.x < autoAssociationViewWidth/2.f) {
-                                    autoAssociationViewLeft = leftOfRect(nearestItemAttri.frame) - autoAssociationViewWidth;
-                                }
+                                self.indexPathChangeable = NO;
                             }
                         }else {
-                            self.indexPathChangeable = NO;
+                            //=====> 2.1.2.1.2.2 是，手指点x 与 nearest Cell 之间是否够空间放下音频 ？
+                            if ((leftOfRect(nearestItemAttri.frame) - currentThumbPoint.x) < autoAssociationViewWidth/2.f) {
+                                //======> 2.1.2.1.2.1 否，assCell right = nearest Cell left。
+                                autoAssociationViewLeft = leftOfRect(nearestItemAttri.frame) - autoAssociationViewWidth;
+                            }
                         }
                     }
                     if (leftOfRect(nearestItemAttri.frame) < autoAssociationViewRight) {
                         autoAssociationViewLeft = leftOfRect(nearestItemAttri.frame) - autoAssociationViewWidth;
                     }
                 }else {
-                    //右边 👉
+                    //===> 2.1.2.2  右 👉， nearest Cell  的右边 存在 next cell ？
                     UICollectionViewLayoutAttributes *nextNearAttri = self.layoutItemIndexAttrMap[nextIndexPathOf(nearestIndexPath)];
                     if (nextNearAttri) {
-                        //计算是否有位置放下。
-                        float gapWidth = leftOfRect(nextNearAttri.frame) - rightOfRect(nextNearAttri.frame);
+                        //====> 2.1.2.2.1 是，两 cell 之间是否够空间放下音频 ？
+                        float gapWidth = leftOfRect(nextNearAttri.frame) - rightOfRect(nearestItemAttri.frame);
                         if(gapWidth < autoAssociationViewWidth) {
-                            autoAssociationViewWidth = gapWidth;
-                            autoAssociationViewLeft = rightOfRect(nextNearAttri.frame);
-                        }else if((leftOfRect(nextNearAttri.frame) - currentThumbPoint.x) < autoAssociationViewWidth/2.f) {
-                            autoAssociationViewLeft = leftOfRect(nextNearAttri.frame);
+                            //=====> 2.1.2.2.1.1 否，大于最小音频单位 ？Y=> 裁剪，N=> 不允许移动到这里。
+                            if (gapWidth > 0) {
+                                autoAssociationViewWidth = gapWidth;
+                                autoAssociationViewLeft = rightOfRect(nextNearAttri.frame);
+                            }else {
+                                self.indexPathChangeable = NO;
+                            }
+                        }else if((currentThumbPoint.x - rightOfRect(nearestItemAttri.frame)) < autoAssociationViewWidth/2.f) {
+                            //=====> 2.1.2.2.1.2 是，手指点x 与 nearest Cell 之间是否够空间放下（音频/2） ？PS: 音频/2 => 手指点x是中心。
+                            //======> 2.1.2.2.1.2.1 否，assCell left = nearest Cell right。
+                            autoAssociationViewLeft = rightOfRect(nearestItemAttri.frame);
                         }
                     }else {
-                        //不存在，所以 nearestIndexPath 是最后一个元素。
-                        if (rightOfRect(nextNearAttri.frame) > currentThumbPoint.x) {
-                            autoAssociationViewLeft = rightOfRect(nextNearAttri.frame);
-                        }
-                    }
-                    if (rightOfRect(nearestItemAttri.frame) > autoAssociationViewLeft) {
-                        autoAssociationViewLeft = rightOfRect(nearestItemAttri.frame);
+                        //====> 2.1.2.2.2 否，nearest Cell  右边是否够空间放下音频 ？好似一定会够的。
                     }
                 }
                 
                 autoAssociationViewTop = topOfRect(nearestItemAttri.frame);
-
             }else {
-                //case 2.1.1
+                //=> 2.1.1
                 autoAssociationViewTop = heightOfRect([self frameOfDraggingItem]) * nearestIndexPath.section;
             }
         }
