@@ -34,10 +34,20 @@
 - (instancetype)initWithFrame:(CGRect)frame {
     if (self = [super initWithFrame:frame]) {
         self.trackItemWidth = 100;
+//        self.tracksInfoDic = [@{
+//            @"track_1": @[@{@"name": @"audio1", @"color": [UIColor redColor], @"location": @0, @"length": @100}],
+//            @"track_2": @[@{@"name": @"audio2", @"color": [UIColor greenColor], @"location": @20, @"length": @100}],
+//            @"track_3": @[@{@"name": @"audio3", @"color": [UIColor blueColor], @"location": @30, @"length": @100}],
+//        } mutableCopy];
+        
         self.tracksInfoDic = [@{
-            @"track_1": @[@{@"name": @"audio1", @"color": [UIColor redColor], @"location": @0, @"length": @100}],
-            @"track_2": @[@{@"name": @"audio2", @"color": [UIColor greenColor], @"location": @20, @"length": @100}],
-            @"track_3": @[@{@"name": @"audio3", @"color": [UIColor blueColor], @"location": @30, @"length": @100}],
+            @"track_1": @[
+                              @{@"name": @"audio1", @"color": [UIColor redColor], @"location": @0, @"length": @100},
+                              @{@"name": @"audio2", @"color": [UIColor greenColor], @"location": @130, @"length": @100},
+                              @{@"name": @"audio3", @"color": [UIColor blueColor], @"location": @300, @"length": @100},
+            ],
+//            @"track_2": @[@{@"name": @"audio2", @"color": [UIColor greenColor], @"location": @20, @"length": @100}],
+//            @"track_3": @[@{@"name": @"audio3", @"color": [UIColor blueColor], @"location": @30, @"length": @100}],
         } mutableCopy];
         
         self.tracksArray = [self.tracksInfoDic.allValues mutableCopy];

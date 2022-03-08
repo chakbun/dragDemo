@@ -9,6 +9,8 @@
 #import "TPAnimeAudioTrackItemLayout.h"
 #import "TPAnimeTrackLayoutViewFunc.h"
 
+#define TPAnimeAudioTrackItemLayoutBorderUnlimited -1
+
 @interface TPAnimeAudioTrackItemLayout ()
 @property (nonatomic, strong) NSMutableArray<UICollectionViewLayoutAttributes *> *layoutItemAttrs;
 @property (nonatomic, strong) NSMutableDictionary <NSIndexPath *, UICollectionViewLayoutAttributes *> *layoutItemIndexAttrMap;
@@ -18,6 +20,8 @@
 @property (nonatomic, assign) CGRect associationCellFrame;
 
 @property (nonatomic, assign) NSInteger compareIndexPathPosition;
+
+@property (nonatomic, assign) BOOL indexPathChangeable;
 
 @end
 
@@ -55,105 +59,147 @@
     if ([self.delegate isAutoAssociationInSection:indexPath.section]) {
         /**
          这里是自动联想占位图的布局
-         */
-        CGRect soureItemFrame = [self.delegate layoutItemFrameAtIndexPath:sourceIndexPath];
-        CGPoint currentDraggingPoint = [self.delegate currentCGPointOfDraggingItem];
-        
-        NSIndexPath *currentPointOnIndexPath = [self.collectionView indexPathForItemAtPoint:currentDraggingPoint];
-        NSIndexPath *compareIndexPath = nil;
-        NSLog(@"draggingIndexPath=%@", currentPointOnIndexPath.description);
-        BOOL isAutoAssociationcCellIndexPath = [self.delegate isAutoAssociationInSection:currentPointOnIndexPath.section];
-        BOOL draggingAboveItemCell = currentPointOnIndexPath && !isAutoAssociationcCellIndexPath && (currentPointOnIndexPath != sourceIndexPath);
-        
-        float autoAssociationViewX = currentDraggingPoint.x - widthOfRect(soureItemFrame)/2.f;
 
-        self.compareIndexPathPosition = 0; //0:pre 1:next;
-        
-        
-        /**
-         ###1 同一行拖动
+         ### 1 同一行拖动
          => 1.1 没有改变当前数组顺序（indexpath不变）：判断点击cell 的 pre right 和 next left；
-         => 1.2 改变了当前数组顺序（indexg改变）
+         ==> 1.1.1 判断重合 fuck
+         
+         => 1.2 改变了当前数组顺序（indexpath 改变）
          ==> 1.2.1 与cell重合 ，判断当前触碰点与位于重合cell中点位置。
          ===> 1.2.1.1 位于中点左边 👈，判断重合cell left 是否有足够空间（或切割）；
          ===> 1.2.1.2 位于中点右边 👉，判断重合cell right 是否有足够空间（或切割）；
          ==> 1.2.2 与cell不重合：判断同 1.1；
          
+         ### 2 非同一行
+         => 2.1
          */
+        CGPoint currentThumbPoint = [self.delegate currentCGPointOfDraggingItem];
+        NSIndexPath *nearestIndexPath = [self nearestIndexPathForLayoutItemAtPoint:currentThumbPoint];
         
-        if (draggingAboveItemCell) {
-            //判断是在 cell 中点的左边还是右边。
-            if (!isAutoAssociationcCellIndexPath) {
-                //当前手指所在的 cell 的 UICollectionViewLayoutAttributes 👇
-                UICollectionViewLayoutAttributes *abvCellattri = self.layoutItemIndexAttrMap[currentPointOnIndexPath];
-                float abvCellCenterX = centerXOfRect(abvCellattri.frame);
-                if (currentDraggingPoint.x > abvCellCenterX) {
-                    NSLog(@"autoAssociationViewX > abvCellCenterX =======> right");
-                    //寻找下一个元素的空位。
-                    NSIndexPath *nextIndexPath = [NSIndexPath indexPathForRow:currentPointOnIndexPath.row + 1 inSection:currentPointOnIndexPath.section];
-                    if(self.layoutItemIndexAttrMap[nextIndexPath]) {
-                        //表示有下一个元素。
-                        compareIndexPath = nextIndexPath;
-                        self.compareIndexPathPosition = 1;
+        BOOL draggingIndexPathChanged = nearestIndexPath != sourceIndexPath;
+        NSLog(@"draggingIndexPathChanged = %i", draggingIndexPathChanged);
+        NSIndexPath *preIndexPath = previousIndexPath(nearestIndexPath);
+        NSIndexPath *nexIndexPath = nextIndexPathOf(nearestIndexPath);
+        UICollectionViewLayoutAttributes *sourceItemAttri = self.layoutItemIndexAttrMap[sourceIndexPath];
+        UICollectionViewLayoutAttributes *nearestItemAttri = self.layoutItemIndexAttrMap[nearestIndexPath];
+        UICollectionViewLayoutAttributes *preItemAttri = self.layoutItemIndexAttrMap[preIndexPath];
+        UICollectionViewLayoutAttributes *nexItemAttri = self.layoutItemIndexAttrMap[nexIndexPath];
+        
+        float autoAssociationViewLeft = currentThumbPoint.x - widthOfRect(sourceItemAttri.frame)/2.f;
+        float autoAssociationViewRight = currentThumbPoint.x + widthOfRect(sourceItemAttri.frame)/2.f;
+        float autoAssociationViewTop = currentThumbPoint.y;
+        float autoAssociationViewWidth = widthOfRect(sourceItemAttri.frame);
+
+        float borderLeft = TPAnimeAudioTrackItemLayoutBorderUnlimited;
+        float borderRight = TPAnimeAudioTrackItemLayoutBorderUnlimited;
+        
+        NSIndexPath *overLapIndexPath = [self.collectionView indexPathForItemAtPoint:currentThumbPoint];
+        if (overLapIndexPath == sourceIndexPath) {
+            overLapIndexPath = nil;
+        }
+        
+        self.indexPathChangeable = YES;
+        
+        if (currentThumbPoint.y >= topOfRect(sourceItemAttri.frame) && currentThumbPoint.y < bottomOfRect(sourceItemAttri.frame)) {
+            //same section
+            if (draggingIndexPathChanged) {
+                //case 1.2
+                if (nearestIndexPath.row < sourceIndexPath.row) {
+                    //drag to left
+                    if(rightOfRect(nearestItemAttri.frame) > currentThumbPoint.x) {
+                        // case 1.2.1 重合
+                        overLapIndexPath = nearestIndexPath;
+                        UICollectionViewLayoutAttributes *overLapAttri = nearestItemAttri;
+                        if (currentThumbPoint.x < centerXOfRect(overLapAttri.frame)) {
+                            NSIndexPath *preOverLapIndexPath = previousIndexPath(overLapIndexPath);
+                            UICollectionViewLayoutAttributes *preOverLapAttri = self.layoutItemIndexAttrMap[preOverLapIndexPath];
+                            if (preOverLapAttri) {
+                                float gapWidth = leftOfRect(overLapAttri.frame) - rightOfRect(preOverLapAttri.frame);
+                                if (gapWidth < autoAssociationViewWidth) {
+                                    //放不下->裁剪。
+                                    autoAssociationViewWidth = gapWidth;
+                                    autoAssociationViewLeft = leftOfRect(overLapAttri.frame) - autoAssociationViewWidth;
+                                }else if(leftOfRect(overLapAttri.frame) - currentThumbPoint.x < autoAssociationViewWidth) {
+                                    //放得下，但是当前触碰起点放不下，需要改变left。
+                                    autoAssociationViewLeft = leftOfRect(overLapAttri.frame) - autoAssociationViewWidth;
+                                }
+                            }else {
+                                //不存在，所以 preOverLapIndexPath 是第一个元素。
+                                if (leftOfRect(overLapAttri.frame) > 0) {
+                                    if (leftOfRect(overLapAttri.frame) < autoAssociationViewWidth) {
+                                        autoAssociationViewWidth = leftOfRect(overLapAttri.frame); //case:x=0;
+                                    }
+                                    autoAssociationViewLeft = rightOfRect(preOverLapAttri.frame) - autoAssociationViewWidth;
+                                }else {
+                                    self.indexPathChangeable = NO;
+                                }
+                            }
+                        }else {
+                            NSIndexPath *nexOverLapIndexPath = nextIndexPathOf(overLapIndexPath);
+                            UICollectionViewLayoutAttributes *nexOverLapAttri = nil;
+                            if (nexOverLapIndexPath != sourceIndexPath) {
+                                nexOverLapAttri = self.layoutItemIndexAttrMap[nexOverLapIndexPath];
+                            }
+                            if (nexOverLapAttri) {
+                                //存在下一个，判断是否放得下。
+                                float gapWidth = leftOfRect(nexOverLapAttri.frame) - rightOfRect(overLapAttri.frame);
+                                if (gapWidth < autoAssociationViewWidth) {
+                                    //放不下->裁剪。
+                                    autoAssociationViewWidth = gapWidth;
+                                    autoAssociationViewLeft = rightOfRect(overLapAttri.frame);
+                                }else if(currentThumbPoint.x - rightOfRect(overLapAttri.frame) < autoAssociationViewWidth){
+                                    //放得下，但是当前触碰起点放不下，需要改变left。
+                                    autoAssociationViewLeft = rightOfRect(overLapAttri.frame);
+                                }
+                            }else {
+                                autoAssociationViewLeft = rightOfRect(overLapAttri.frame);
+                            }
+                        }
                     }else {
-                        compareIndexPath = currentPointOnIndexPath;
-                        //没有下一个元素，插到末尾。
+                        // case 1.2.2 不重合
+                        if (autoAssociationViewLeft <= rightOfRect(nearestItemAttri.frame)) {
+                            autoAssociationViewLeft = rightOfRect(nearestItemAttri.frame);
+                        }
                     }
-                    
                 }else {
-                    NSLog(@"autoAssociationViewX < abvCellCenterX =======> left");
-                    //寻找上一个元素
-                    NSIndexPath *preIndexPath = [NSIndexPath indexPathForRow:currentPointOnIndexPath.row - 1 inSection:currentPointOnIndexPath.section];
-                    if(self.layoutItemIndexAttrMap[preIndexPath]) {
-                        //有上一个元素。
-                        compareIndexPath = preIndexPath;
-                        self.compareIndexPathPosition = 0;
-                    }else {
-                        //没有上一个元素。
+                    //drag to right
+                    if(leftOfRect(nearestItemAttri.frame) < currentThumbPoint.x) {
+                        //重合
+                        
                     }
-                    
+                }
+            }else {
+                //case 1.2
+                if (preItemAttri) {
+                    borderLeft = rightOfRect(preItemAttri.frame);
+                }
+                if (nexItemAttri) {
+                    borderRight = leftOfRect(nexItemAttri.frame);
+                }
+                if (borderLeft != TPAnimeAudioTrackItemLayoutBorderUnlimited && autoAssociationViewLeft <= borderLeft) {
+                    autoAssociationViewLeft = borderLeft;
+                    //判断是否放得下。
+                    if(borderRight - borderLeft < autoAssociationViewWidth) {
+                        autoAssociationViewWidth = borderRight - borderLeft;
+                    }
+                }else if(borderRight != TPAnimeAudioTrackItemLayoutBorderUnlimited && autoAssociationViewRight > borderRight){
+                    autoAssociationViewLeft = borderRight - autoAssociationViewWidth;
                 }
             }
+            
+            autoAssociationViewTop = topOfRect(sourceItemAttri.frame);
+
         }else {
-            //### CASE3
-            currentPointOnIndexPath = [self nearestIndexPathForLayoutItemAtPoint:currentDraggingPoint];
-            compareIndexPath = currentPointOnIndexPath;
-            self.compareIndexPathPosition = 0;
+            //diff section
+            
         }
         
-        UICollectionViewLayoutAttributes *compareAttri = self.layoutItemIndexAttrMap[compareIndexPath];
-        BOOL placeHolderXOccupied = NO;
-        
-        if (self.compareIndexPathPosition == 0) {
-            //比较左边👈
-            if ((compareIndexPath.row == [self.delegate numberOfRow4TrackItemLayoutInSection:currentPointOnIndexPath.section] -1) && currentPointOnIndexPath != sourceIndexPath && (compareIndexPath == currentPointOnIndexPath)) {
-                //### FOR CASE3 above
-                placeHolderXOccupied = ( autoAssociationViewX < centerXOfRect(compareAttri.frame));
-            }else if(currentPointOnIndexPath != sourceIndexPath){
-                //不在自己原来位置上的拖动。
-                placeHolderXOccupied = ( autoAssociationViewX > leftOfRect(compareAttri.frame));
-            }else if(currentPointOnIndexPath == sourceIndexPath){
-                //比较自己
-                if (compareAttri.frame.origin.x) {
-                    
-                }
-            }
-        }else {
-            //比较右边👉
-        }
-        
-        
-        
-        //判断当前x是否有cell占用，yes:寻找当前section最近可用的。 no：使用当前位置
-        //这里还得根据塞入的位置改变 size。
-        if (placeHolderXOccupied) {
-            atti.frame = CGRectMake(compareAttri.frame.origin.x + compareAttri.size.width, currentPointOnIndexPath.section * soureItemFrame.size.height, soureItemFrame.size.width, soureItemFrame.size.height);
-        }else {
-            atti.frame = CGRectMake(autoAssociationViewX, currentPointOnIndexPath.section * soureItemFrame.size.height, soureItemFrame.size.width, soureItemFrame.size.height);
-        }
+        atti.frame = CGRectMake(autoAssociationViewLeft, autoAssociationViewTop, autoAssociationViewWidth, heightOfRect(sourceItemAttri.frame));
+    
         self.associationCellFrame = atti.frame;
         atti.zIndex = 2;
         atti.alpha = sourceIndexPath ? 1.f : 0.f;
+//        atti.alpha = self.indexPathChangeable ? 1.f : 0.f;
     }else {
         //这里是元素cell布局。（音频元素etc）
         atti.frame = [self.delegate layoutItemFrameAtIndexPath:indexPath];
@@ -205,30 +251,53 @@
     pointInSection = MAX(0, pointInSection);
     NSArray *attrsInSection = self.layoutItemSectionAttrsMap[@(pointInSection)];
     NSInteger pointInNearestRow = getRowByBinaryCheck(attrsInSection, point.x);
+
+    //修正：
+    UICollectionViewLayoutAttributes *targetAttri = attrsInSection[pointInNearestRow];
+    if (point.x < leftOfRect(targetAttri.frame)) {
+        //位于左边👈
+        NSInteger preNearestRow = pointInNearestRow - 1;
+        if (preNearestRow >= 0) {
+            UICollectionViewLayoutAttributes *preTargetAttri = attrsInSection[preNearestRow];
+            if(fabs(point.x - rightOfRect(preTargetAttri.frame)) < fabs(point.x - leftOfRect(targetAttri.frame))) {
+                pointInNearestRow = preNearestRow;
+            }
+        }
+    }else {
+        //👉
+        NSInteger nexNearestRow = pointInNearestRow - 1;
+        if (nexNearestRow < attrsInSection.count) {
+            UICollectionViewLayoutAttributes *nexTargetAttri = attrsInSection[nexNearestRow];
+            if(fabs(point.x - leftOfRect(nexTargetAttri.frame)) < fabs(point.x - rightOfRect(targetAttri.frame))) {
+                pointInNearestRow = nexNearestRow;
+            }
+        }
+        
+    }
     return [NSIndexPath indexPathForRow:pointInNearestRow inSection:pointInSection];
 }
 
 #pragma mark - Function
 NSInteger getRowByBinaryCheck(NSArray *sources, float checkX) {
-    NSInteger index = 0, lowerBound = 0, upperBound = sources.count;
-    NSInteger midBound;
-    while (lowerBound < upperBound) {
-        midBound = lowerBound + (upperBound - lowerBound) / 2;
-        UICollectionViewLayoutAttributes *attr = sources[midBound];
+    NSInteger index = 0, boundLeft = 0, boundRight = sources.count;
+    NSInteger boundMid;
+    while (boundLeft < boundRight) {
+        boundMid = boundLeft + (boundRight - boundLeft) / 2;
+        UICollectionViewLayoutAttributes *attr = sources[boundMid];
         if (attr.frame.origin.x < checkX) {
-            lowerBound = midBound  + 1;
+            boundLeft = boundMid  + 1;
         }else {
-            upperBound = midBound;
+            boundRight = boundMid;
         }
     }
     
-    if (lowerBound == upperBound) {
-        if(upperBound == sources.count) {
+    if (boundLeft == boundRight) {
+        if(boundRight == sources.count) {
             index = sources.count - 1;
-        }else if(lowerBound == 0){
+        }else if(boundLeft == 0){
             index = 0;
         }else {
-            index = lowerBound;
+            index = boundLeft;
         }
     }
     return index;
