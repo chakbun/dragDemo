@@ -9,7 +9,7 @@
 #import "TPAnimeAudioTrackItemLayout.h"
 #import "TPAnimeTrackLayoutViewFunc.h"
 
-#define TPAnimeAudioTrackItemLayoutBorderUnlimited -1
+#define TPAnimeAudioTrackItemLayoutAssCellHeightInInsert 3
 
 @interface TPAnimeAudioTrackItemLayout ()
 @property (nonatomic, strong) NSMutableArray<UICollectionViewLayoutAttributes *> *layoutItemAttrs;
@@ -19,7 +19,8 @@
 
 @property (nonatomic, assign) CGRect associationCellFrame;
 
-@property (nonatomic, assign) BOOL indexPathChangeable;
+@property (nonatomic, assign) BOOL indexPathChangeable; //是否可插入。
+@property (nonatomic, assign) NSInteger insertSection; //0: 没有新增行，1:新增行。
 
 @end
 
@@ -58,6 +59,7 @@
         /**
          这里是自动联想占位图的布局
          assCell = 自动联想cell。
+         nearest Cell = 当前手指x位置最靠近的被拖动元素那个 cell;
          
          ### 1 同一行拖动
          => 1.1 最近的 nearest Cell 改变了 ？
@@ -116,14 +118,13 @@
         UICollectionViewLayoutAttributes *sourceItemAttri = self.layoutItemIndexAttrMap[sourceIndexPath];
         
         NSIndexPath *nearestIndexPath = [self nearestIndexPathForLayoutItemAtPoint:currentThumbPoint];
-        NSLog(@"nearestIndexPath=%@",nearestIndexPath.description);
+//        NSLog(@"nearestIndexPath=%@",nearestIndexPath.description);
         UICollectionViewLayoutAttributes *nearestItemAttri = self.layoutItemIndexAttrMap[nearestIndexPath];
         if ([self.delegate isAutoAssociationInSection:nearestIndexPath.section]) {
             nearestItemAttri = nil;
         }
 
         BOOL draggingIndexPathChanged = nearestIndexPath != sourceIndexPath;
-        BOOL lastItemInSection = (nearestIndexPath.row == [self.delegate numberOfRow4TrackItemLayoutInSection:nearestIndexPath.section] -1 );
         
         UICollectionViewLayoutAttributes *preItemAttri = nil;
         UICollectionViewLayoutAttributes *nexItemAttri = nil;
@@ -140,111 +141,133 @@
         float autoAssociationViewRight = currentThumbPoint.x + widthOfRect(sourceItemAttri.frame)/2.f;
         float autoAssociationViewTop = currentThumbPoint.y;
         float autoAssociationViewWidth = widthOfRect(sourceItemAttri.frame);
-        
-        float borderLeft = TPAnimeAudioTrackItemLayoutBorderUnlimited;
-        float borderRight = TPAnimeAudioTrackItemLayoutBorderUnlimited;
-        
+        float autoAssociationViewHeight = heightOfRect(sourceItemAttri.frame);
+
         NSIndexPath *overLapIndexPath = [self.collectionView indexPathForItemAtPoint:currentThumbPoint];
         if (overLapIndexPath == sourceIndexPath) {
             overLapIndexPath = nil;
         }
         
         self.indexPathChangeable = YES;
-        
+        self.insertSection = 0;
         if (currentThumbPoint.y >= topOfRect(sourceItemAttri.frame) && currentThumbPoint.y < bottomOfRect(sourceItemAttri.frame)) {
             //### 1 同一行拖动
-            if (draggingIndexPathChanged) {
-                //==> 1.1.2 是，手指点x 最近的 nearest Cell 左 ⬅️ or右 ➡️ ？
-                if(currentThumbPoint.x < centerXOfRect(nearestItemAttri.frame)) {
-                    UICollectionViewLayoutAttributes *preNearAttri = self.layoutItemIndexAttrMap[previousIndexPath(nearestIndexPath)];
-                    if (preNearAttri.indexPath == sourceIndexPath) {
-                        preNearAttri = nil;
-                    }
-                    if (preNearAttri) {
-                        float gapWidth = leftOfRect(nearestItemAttri.frame) - rightOfRect(preNearAttri.frame);
-                        if (gapWidth < autoAssociationViewWidth) {
-                            if (gapWidth > 0) {
-                                autoAssociationViewWidth = gapWidth;
-                                autoAssociationViewLeft = rightOfRect(preNearAttri.frame);
-                            }else {
-                                self.indexPathChangeable = NO;
+            /**
+             插入一段逻辑：在行内，但距离上下边界不足 若干 0.25 && 行数<max
+             */
+            autoAssociationViewTop = topOfRect(sourceItemAttri.frame);
+            if (currentThumbPoint.y < topOfRectWithRatioMargin(sourceItemAttri.frame, 0.25)) {
+                autoAssociationViewHeight = TPAnimeAudioTrackItemLayoutAssCellHeightInInsert;
+                self.insertSection = 1;
+            }else if(currentThumbPoint.y > bottomOfRectWithRatioMargin(sourceItemAttri.frame, 0.25)) {
+                autoAssociationViewHeight = TPAnimeAudioTrackItemLayoutAssCellHeightInInsert;
+                autoAssociationViewTop = bottomOfRect(sourceItemAttri.frame) - autoAssociationViewHeight;
+                self.insertSection = 1;
+            }else {
+                if (draggingIndexPathChanged) {
+                    //==> 1.1.2 是，手指点x 最近的 nearest Cell 左 ⬅️ or右 ➡️ ？
+                    if(currentThumbPoint.x < centerXOfRect(nearestItemAttri.frame)) {
+                        UICollectionViewLayoutAttributes *preNearAttri = self.layoutItemIndexAttrMap[previousIndexPath(nearestIndexPath)];
+                        if (preNearAttri.indexPath == sourceIndexPath) {
+                            preNearAttri = nil;
+                        }
+                        if (preNearAttri) {
+                            float gapWidth = leftOfRect(nearestItemAttri.frame) - rightOfRect(preNearAttri.frame);
+                            if (gapWidth < autoAssociationViewWidth) {
+                                if (gapWidth > 0) {
+                                    autoAssociationViewWidth = gapWidth;
+                                    autoAssociationViewLeft = rightOfRect(preNearAttri.frame);
+                                }else {
+                                    self.indexPathChangeable = NO;
+                                }
+                            }else if(currentThumbPoint.x - leftOfRect(nearestItemAttri.frame) < autoAssociationViewWidth/2.f){
+                                autoAssociationViewLeft = leftOfRect(nearestItemAttri.frame) - autoAssociationViewWidth;
                             }
-                        }else if(currentThumbPoint.x - leftOfRect(nearestItemAttri.frame) < autoAssociationViewWidth/2.f){
+                        }else {
+                            if (leftOfRect(nearestItemAttri.frame) < autoAssociationViewWidth) {
+                                if (leftOfRect(nearestItemAttri.frame) > 0) {
+                                    autoAssociationViewWidth = leftOfRect(nearestItemAttri.frame);
+                                    autoAssociationViewLeft = 0;
+                                }else {
+                                    self.indexPathChangeable = NO;
+                                }
+                            }else {
+                                if ((leftOfRect(nearestItemAttri.frame) - currentThumbPoint.x) < autoAssociationViewWidth/2.f) {
+                                    autoAssociationViewLeft = leftOfRect(nearestItemAttri.frame) - autoAssociationViewWidth;
+                                }
+                            }
+                        }
+                        if (leftOfRect(nearestItemAttri.frame) < autoAssociationViewRight) {
                             autoAssociationViewLeft = leftOfRect(nearestItemAttri.frame) - autoAssociationViewWidth;
                         }
                     }else {
-                        if (leftOfRect(nearestItemAttri.frame) < autoAssociationViewWidth) {
-                            if (leftOfRect(nearestItemAttri.frame) > 0) {
-                                autoAssociationViewWidth = leftOfRect(nearestItemAttri.frame);
-                                autoAssociationViewLeft = 0;
-                            }else {
-                                self.indexPathChangeable = NO;
+                        UICollectionViewLayoutAttributes *nextNearAttri = self.layoutItemIndexAttrMap[nextIndexPathOf(nearestIndexPath)];
+                        if (nextNearAttri.indexPath == sourceIndexPath) {
+                            nextNearAttri = nil;
+                        }
+                        if (nextNearAttri) {
+                            float gapWidth = leftOfRect(nextNearAttri.frame) - rightOfRect(nearestItemAttri.frame);
+                            if(gapWidth < autoAssociationViewWidth) {
+                                if (gapWidth > 0) {
+                                    autoAssociationViewWidth = gapWidth;
+                                    autoAssociationViewLeft = rightOfRect(nearestItemAttri.frame);
+                                }else {
+                                    self.indexPathChangeable = NO;
+                                }
+                            }else if((currentThumbPoint.x - rightOfRect(nearestItemAttri.frame)) < autoAssociationViewWidth/2.f) {
+                                autoAssociationViewLeft = rightOfRect(nearestItemAttri.frame);
                             }
                         }else {
-                            if ((leftOfRect(nearestItemAttri.frame) - currentThumbPoint.x) < autoAssociationViewWidth/2.f) {
-                                autoAssociationViewLeft = leftOfRect(nearestItemAttri.frame) - autoAssociationViewWidth;
-                            }
-                        }
-                    }
-                    if (leftOfRect(nearestItemAttri.frame) < autoAssociationViewRight) {
-                        autoAssociationViewLeft = leftOfRect(nearestItemAttri.frame) - autoAssociationViewWidth;
-                    }
-                }else {
-                    UICollectionViewLayoutAttributes *nextNearAttri = self.layoutItemIndexAttrMap[nextIndexPathOf(nearestIndexPath)];
-                    if (nextNearAttri.indexPath == sourceIndexPath) {
-                        nextNearAttri = nil;
-                    }
-                    if (nextNearAttri) {
-                        float gapWidth = leftOfRect(nextNearAttri.frame) - rightOfRect(nearestItemAttri.frame);
-                        if(gapWidth < autoAssociationViewWidth) {
-                            if (gapWidth > 0) {
-                                autoAssociationViewWidth = gapWidth;
+                            if (autoAssociationViewLeft < rightOfRect(nearestItemAttri.frame)) {
                                 autoAssociationViewLeft = rightOfRect(nearestItemAttri.frame);
-                            }else {
-                                self.indexPathChangeable = NO;
                             }
-                        }else if((currentThumbPoint.x - rightOfRect(nearestItemAttri.frame)) < autoAssociationViewWidth/2.f) {
-                            autoAssociationViewLeft = rightOfRect(nearestItemAttri.frame);
-                        }
-                    }else {
-                        if (autoAssociationViewLeft < rightOfRect(nearestItemAttri.frame)) {
-                            autoAssociationViewLeft = rightOfRect(nearestItemAttri.frame);
-                        }
-                    }
-                }
-            }else {
-                //==> 1.1.1 否，往左 ⬅️ or右 ➡️ 移动 ？
-                if (currentThumbPoint.x < centerXOfRect(sourceItemAttri.frame)) {
-                    //===> 1.1.1.1 左👈，nearest Cell  的左边存在 pre cell ？
-                    if (preItemAttri) {
-                        if (autoAssociationViewLeft < rightOfRect(preItemAttri.frame)) {
-                            autoAssociationViewLeft = rightOfRect(preItemAttri.frame);
-                        }
-                    }else {
-                        if (autoAssociationViewLeft < 0) {
-                            autoAssociationViewLeft = 0;
                         }
                     }
                 }else {
-                    //===> 1.1.1.2 右👉，nearest Cell  的右边存在 next cell ？
-                    if (nexItemAttri) {
-                        if (autoAssociationViewRight > leftOfRect(nexItemAttri.frame)) {
-                            autoAssociationViewLeft = leftOfRect(nexItemAttri.frame) - autoAssociationViewWidth;
+                    //==> 1.1.1 否，往左 ⬅️ or右 ➡️ 移动 ？
+                    if (currentThumbPoint.x < centerXOfRect(sourceItemAttri.frame)) {
+                        //===> 1.1.1.1 左👈，nearest Cell  的左边存在 pre cell ？
+                        if (preItemAttri) {
+                            if (autoAssociationViewLeft < rightOfRect(preItemAttri.frame)) {
+                                autoAssociationViewLeft = rightOfRect(preItemAttri.frame);
+                            }
+                        }else {
+                            if (autoAssociationViewLeft < 0) {
+                                autoAssociationViewLeft = 0;
+                            }
                         }
                     }else {
-                        
+                        //===> 1.1.1.2 右👉，nearest Cell  的右边存在 next cell ？
+                        if (nexItemAttri) {
+                            if (autoAssociationViewRight > leftOfRect(nexItemAttri.frame)) {
+                                autoAssociationViewLeft = leftOfRect(nexItemAttri.frame) - autoAssociationViewWidth;
+                            }
+                        }else {
+                            
+                        }
                     }
                 }
             }
-            autoAssociationViewTop = topOfRect(sourceItemAttri.frame);
 
         }else {
-            //### 2 跨行拖动
+            //### 2 跨行拖动(超出边距)
+            if (currentThumbPoint.y < 0) {
+                autoAssociationViewHeight = TPAnimeAudioTrackItemLayoutAssCellHeightInInsert;
+                autoAssociationViewTop = 0;
+                self.insertSection = 1;
+            }else if(currentThumbPoint.y > self.delegate.trackLayoutContentSize.height) {
+                autoAssociationViewHeight = TPAnimeAudioTrackItemLayoutAssCellHeightInInsert;
+                autoAssociationViewTop = self.delegate.trackLayoutContentSize.height-autoAssociationViewHeight;
+                self.insertSection = 1;
+            }else
             if (nearestItemAttri) {
                 //==> 2.1.2 有，手指点x 最近的 nearest Cell 左 or 右 ？
                 if(currentThumbPoint.x < centerXOfRect(nearestItemAttri.frame)) {
                     //===> 2.1.2.1  左 👈， nearest Cell  的左边 存在 pre cell ？
                     UICollectionViewLayoutAttributes *preNearAttri = self.layoutItemIndexAttrMap[previousIndexPath(nearestIndexPath)];
+                    if (preNearAttri.indexPath == sourceIndexPath) {
+                        preNearAttri = nil;
+                    }
                     if (preNearAttri) {
                         //====> 2.1.2.1.1 是，两 cell 之间是否够空间放下音频 ？
                         float gapWidth = leftOfRect(nearestItemAttri.frame) - rightOfRect(preNearAttri.frame);
@@ -286,6 +309,9 @@
                 }else {
                     //===> 2.1.2.2  右 👉， nearest Cell  的右边 存在 next cell ？
                     UICollectionViewLayoutAttributes *nextNearAttri = self.layoutItemIndexAttrMap[nextIndexPathOf(nearestIndexPath)];
+                    if (nextNearAttri.indexPath == sourceIndexPath) {
+                        nextNearAttri = nil;
+                    }
                     if (nextNearAttri) {
                         //====> 2.1.2.2.1 是，两 cell 之间是否够空间放下音频 ？
                         float gapWidth = leftOfRect(nextNearAttri.frame) - rightOfRect(nearestItemAttri.frame);
@@ -318,7 +344,7 @@
             }
         }
         
-        atti.frame = CGRectMake(autoAssociationViewLeft, autoAssociationViewTop, autoAssociationViewWidth, heightOfRect(sourceItemAttri.frame));
+        atti.frame = CGRectMake(autoAssociationViewLeft, autoAssociationViewTop, autoAssociationViewWidth, autoAssociationViewHeight);
     
         self.associationCellFrame = atti.frame;
         atti.zIndex = 2;
@@ -338,6 +364,10 @@
 }
 
 #pragma mark - Getter
+- (NSInteger)autoAssociationCellInNewSection {
+    return self.insertSection;
+}
+
 - (CGRect)autoAssociationCellRect {
     return self.associationCellFrame;
 }
@@ -400,10 +430,10 @@
         if(rightOfRect(nAttri.frame) > self.autoAssociationCellRect.origin.x) {
             return nIndexPath.row;
         }
+    }else {
+        return row+1;
     }
-    
     return row;
-    
 }
 
 - (CGRect)frameOfDraggingItem {
@@ -425,27 +455,30 @@
     NSInteger pointInNearestRow = getRowByBinaryCheck(attrsInSection, point.x);
 
     //修正：
-    UICollectionViewLayoutAttributes *targetAttri = attrsInSection[pointInNearestRow];
-    if (point.x < leftOfRect(targetAttri.frame)) {
-        //位于左边👈
-        NSInteger preNearestRow = pointInNearestRow - 1;
-        if (preNearestRow >= 0) {
-            UICollectionViewLayoutAttributes *preTargetAttri = attrsInSection[preNearestRow];
-            if(fabs(point.x - rightOfRect(preTargetAttri.frame)) < fabs(point.x - leftOfRect(targetAttri.frame))) {
-                pointInNearestRow = preNearestRow;
+    if (attrsInSection.count > pointInNearestRow) {
+        UICollectionViewLayoutAttributes *targetAttri = attrsInSection[pointInNearestRow];
+        if (point.x < leftOfRect(targetAttri.frame)) {
+            //位于左边👈
+            NSInteger preNearestRow = pointInNearestRow - 1;
+            if (preNearestRow >= 0) {
+                UICollectionViewLayoutAttributes *preTargetAttri = attrsInSection[preNearestRow];
+                if(fabs(point.x - rightOfRect(preTargetAttri.frame)) < fabs(point.x - leftOfRect(targetAttri.frame))) {
+                    pointInNearestRow = preNearestRow;
+                }
             }
-        }
-    }else {
-        //👉
-        NSInteger nexNearestRow = pointInNearestRow - 1;
-        if (nexNearestRow < attrsInSection.count) {
-            UICollectionViewLayoutAttributes *nexTargetAttri = attrsInSection[nexNearestRow];
-            if(fabs(point.x - leftOfRect(nexTargetAttri.frame)) < fabs(point.x - rightOfRect(targetAttri.frame))) {
-                pointInNearestRow = nexNearestRow;
+        }else {
+            //👉
+            NSInteger nexNearestRow = pointInNearestRow - 1;
+            if (nexNearestRow < attrsInSection.count) {
+                UICollectionViewLayoutAttributes *nexTargetAttri = attrsInSection[nexNearestRow];
+                if(fabs(point.x - leftOfRect(nexTargetAttri.frame)) < fabs(point.x - rightOfRect(targetAttri.frame))) {
+                    pointInNearestRow = nexNearestRow;
+                }
             }
+            
         }
-        
     }
+   
     return [NSIndexPath indexPathForRow:pointInNearestRow inSection:pointInSection];
 }
 
@@ -463,7 +496,7 @@ NSInteger getRowByBinaryCheck(NSArray *sources, float checkX) {
         }
     }
     
-    if (boundLeft == boundRight) {
+    if (boundLeft == boundRight && sources.count > 0) {
         if(boundRight == sources.count) {
             index = sources.count - 1;
         }else if(boundLeft == 0){

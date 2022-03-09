@@ -31,15 +31,15 @@
 }
 
 - (void)tapGestureAction:(UITapGestureRecognizer *)reg {
-    [self.trView mas_updateConstraints:^(MASConstraintMaker *make) {
-        make.height.mas_equalTo(30);
-    }];
-    self.trView.trackSelected = NO;
+//    [self.trView mas_updateConstraints:^(MASConstraintMaker *make) {
+//        make.height.mas_equalTo(30);
+//    }];
+//    self.trView.trackSelected = NO;
 }
 
 - (void)audioTrackView:(id)trackView didSelectedItemAtIndexPath:(NSIndexPath *)indexpath {
     [self.trView mas_updateConstraints:^(MASConstraintMaker *make) {
-        make.height.mas_equalTo(120);
+        make.height.mas_equalTo(80);
     }];
 }
 

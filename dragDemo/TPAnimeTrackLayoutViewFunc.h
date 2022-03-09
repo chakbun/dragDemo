@@ -9,6 +9,15 @@
 #define TPAnimeTrackLayoutViewFunc_h
 
 #pragma mark - View Function
+static inline float topOfRectWithRatioMargin(CGRect rect, float ratio) {
+    return rect.origin.y + rect.size.width * ratio;
+}
+
+static inline float bottomOfRectWithRatioMargin(CGRect rect, float ratio) {
+    float ratioV = MIN(1, MAX(0, ratio)) ;
+    return rect.origin.y + rect.size.height*(1-ratioV);
+}
+
 static inline float leftOfRect(CGRect rect) {
     return rect.origin.x;
 }

@@ -11,6 +11,7 @@
 #import "Masonry.h"
 #import "TPAudioTrackItemCell.h"
 #import "TPAudioTrackItemPlaceholderCell.h"
+#import "TPAnimeTrackLayoutViewFunc.h"
 
 @interface TPAudioTrackView ()<UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, TPAnimeAudioTrackItemLayoutDelegate>
 
@@ -163,6 +164,7 @@
             UICollectionViewCell *cell = [self.trackCollectionView cellForItemAtIndexPath:pressedIndexPath];
             self.draggingThumbView = [cell snapshotViewAfterScreenUpdates:NO];
             self.draggingThumbView.frame = cell.frame;
+            self.draggingThumbView.alpha = 0.6;
             [self.trackCollectionView addSubview:self.draggingThumbView];
             [self.trackCollectionView reloadData];
             //            [self.itemLayout invalidateLayout];
@@ -176,50 +178,85 @@
             }
             self.destinationSectionOfDraggingItem = pressedIndexPath.section;
             self.destinationRowOfDraggingItem = pressedIndexPath.row;
-//            NSLog(@"changing y:%.2f, section:%i row:%i", (float)pressedPointInCollectionView.y, (int)self.destinationSectionOfDraggingItem, (int)self.destinationRowOfDraggingItem);
             [self.itemLayout invalidateLayout];
         }
             break;
         case UIGestureRecognizerStateEnded: {
             NSMutableArray *sourceTrackItems = [self.tracksArray[self.draggingIndexPath.section] mutableCopy];
             NSMutableArray *destinationTrackItems = sourceTrackItems;
-            if (self.draggingIndexPath.section != self.destinationSectionOfDraggingItem) {
-                if (self.destinationSectionOfDraggingItem < self.tracksArray.count) {
-                    destinationTrackItems = [self.tracksArray[self.destinationSectionOfDraggingItem] mutableCopy];
-                }else {
-                    destinationTrackItems = [NSMutableArray array];
+            
+            //1. 取出目标数据，如果没有则创建。
+            if (self.itemLayout.autoAssociationCellInNewSection > 0) {
+                destinationTrackItems = [NSMutableArray array];
+            }else {
+                if (self.draggingIndexPath.section != self.destinationSectionOfDraggingItem) {
+                    if (self.destinationSectionOfDraggingItem < self.tracksArray.count) {
+                        destinationTrackItems = [self.tracksArray[self.destinationSectionOfDraggingItem] mutableCopy];
+                    }else {
+                        destinationTrackItems = [NSMutableArray array];
+                    }
                 }
             }
-            
+
+            //2.移除源数据
             NSMutableDictionary *sourceTrackItem = [sourceTrackItems[self.draggingIndexPath.row] mutableCopy];
             if (sourceTrackItems.count > self.draggingIndexPath.row) {
                 [sourceTrackItems removeObjectAtIndex:self.draggingIndexPath.row];
             }
             
+            //3.更新目标数据信息（位置、长度）等。
             sourceTrackItem[@"location"] = @(self.itemLayout.autoAssociationCellRect.origin.x);
             sourceTrackItem[@"length"] = @(self.itemLayout.autoAssociationCellRect.size.width);
             
-            //修正处理。
-            NSInteger insertIndex = [self.itemLayout fixTargeRowWithSection:self.destinationSectionOfDraggingItem row:self.destinationRowOfDraggingItem];
-            if (destinationTrackItems.count < insertIndex) {
-                insertIndex = destinationTrackItems.count;
+            //4. 修正目标数据位置，插入目标数据。
+            NSInteger insertIndex = 0;
+            if (self.itemLayout.autoAssociationCellInNewSection == 0) {
+                insertIndex = [self.itemLayout fixTargeRowWithSection:self.destinationSectionOfDraggingItem row:self.destinationRowOfDraggingItem];
+                if (destinationTrackItems.count < insertIndex) {
+                    insertIndex = destinationTrackItems.count;
+                }
             }
+            
             [destinationTrackItems insertObject:sourceTrackItem atIndex:insertIndex];
             NSLog(@"destinationRowOfDraggingItem:%@, insert to:%@", @(self.destinationRowOfDraggingItem), @(insertIndex));
             NSLog(@"destinationTrackItems=%@", destinationTrackItems);
 
+            BOOL needUpdateHeight = YES;
+
+            //5. 将源数据和目标数据更新到 数据列表。
             [self.tracksArray replaceObjectAtIndex:self.draggingIndexPath.section withObject:sourceTrackItems];
-            if (self.draggingIndexPath.section != self.destinationSectionOfDraggingItem) {
-                if (self.destinationSectionOfDraggingItem < self.tracksArray.count) {
-                    [self.tracksArray replaceObjectAtIndex:self.destinationSectionOfDraggingItem withObject:destinationTrackItems];
-                }else {
+            if (self.itemLayout.autoAssociationCellInNewSection > 0) {
+                //需要判断插入的位置。
+                if (topOfRect(self.itemLayout.autoAssociationCellRect) <= 0) {
+                    [self.tracksArray insertObject:destinationTrackItems atIndex:0];
+                }else if(bottomOfRect(self.itemLayout.autoAssociationCellRect) >= self.tracksArray.count*self.trackItemHeight) {
                     [self.tracksArray addObject:destinationTrackItems];
+                }else {
+                    NSInteger insertSection = bottomOfRect(self.itemLayout.autoAssociationCellRect) / self.trackItemHeight;
+                    if (self.tracksArray.count > insertSection) {
+                        [self.tracksArray insertObject:destinationTrackItems atIndex:insertSection];
+                    }
+                }
+            }else {
+                if (self.draggingIndexPath.section != self.destinationSectionOfDraggingItem) {
+                    if (self.destinationSectionOfDraggingItem < self.tracksArray.count) {
+                        [self.tracksArray replaceObjectAtIndex:self.destinationSectionOfDraggingItem withObject:destinationTrackItems];
+                        needUpdateHeight = NO;
+                    }else {
+                        [self.tracksArray addObject:destinationTrackItems];
+                    }
                 }
             }
             self.draggingIndexPath = nil;
             [self.draggingThumbView removeFromSuperview];
             self.draggingThumbView = nil;
             [self.trackCollectionView reloadData];
+            if (needUpdateHeight) {
+                [self mas_updateConstraints:^(MASConstraintMaker *make) {
+                    make.height.mas_equalTo(self.tracksArray.count*self.trackItemHeight);
+                }];
+            }
+            
         }
             break;
         default:
@@ -229,7 +266,7 @@
 
 #pragma mark - Getter
 - (float)trackItemHeight {
-    return self.trackSelected ? 40 : 10;
+    return self.trackSelected ? 80 : 30;
 }
 
 - (TPAnimeAudioTrackItemLayout *)itemLayout {
